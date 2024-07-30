@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Random;
+import java.util.concurrent.TimeUnit;
 
 @SpringBootTest
 class StellarPlayerApplicationTests {
@@ -56,7 +57,7 @@ class StellarPlayerApplicationTests {
         Random random = new Random();
         String color = RandomColor.getRandomColor();
         for (int i = 0; i < 20; i++) {
-            String name = faker.artist().name();
+            String name = faker.artist().name() +" "+ faker.leagueOfLegends().champion();
             Artist artist = Artist.builder()
                     .name(name)
                     .avatar("https://placehold.co/600x400/" + color + "/FFF" + "?text=" + String.valueOf(name.charAt(0)).toUpperCase())
@@ -67,7 +68,28 @@ class StellarPlayerApplicationTests {
                     .build();
             artistRepository.save(artist);
         }
+    }
 
+    @Test
+    void createAlbum() {
+        Faker faker = new Faker(new Locale("en-US"));
+        Random random = new Random();
+        for (int i = 0; i < 10; i++) {
+            String color = RandomColor.getRandomColor();
+            String name = faker.leagueOfLegends().location() +" " + faker.music().instrument() ;
+            List<Artist> allArtists = artistRepository.findAll();
+            int numberOfArtists = random.nextInt(3) + 1;
+            Collections.shuffle(allArtists);
+            Album album = Album.builder()
+                    .title(name)
+                    .cover("https://placehold.co/600x400/" + color + "/FFF" + "?text=" + String.valueOf(name.charAt(0)).toUpperCase())
+                    .status(true)
+                    .artists(allArtists.subList(0, numberOfArtists))
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            albumRepository.save(album);
+        }
     }
 
     @Test
@@ -75,26 +97,26 @@ class StellarPlayerApplicationTests {
         Faker faker = new Faker(new Locale("en-US"));
         Random random = new Random();
         String color = RandomColor.getRandomColor();
-        for (int i = 0; i < 50; i++) {
-            String title = faker.howIMetYourMother().catchPhrase() + " " + faker.music().genre() + " " + faker.music().instrument();
-            List<Artist> allArtists = artistRepository.findAll();
-            int numberOfArtists = random.nextInt(3) + 1;
-            Collections.shuffle(allArtists);
-            Track track = Track.builder()
-                    .title(title)
-                    .duration(random.nextInt(300))
-                    .cover("https://placehold.co/600x400/"+color+ "/FFF" + "?text=" + String.valueOf(title.charAt(0)).toUpperCase())
-                    .lyrics(faker.lorem().paragraph(5))
-                    .status(faker.bool().bool())
-                    .artists(allArtists.subList(0, numberOfArtists))
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
-                    .album(albumRepository.findAll().get(random.nextInt(albumRepository.findAll().size())))
-                    .path("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3")
-                    .build();
-            trackRepository.save(track);
+    for (int i = 0; i < 50; i++) {
+        String title = faker.hipster().word() + " " + faker.music().genre() + " " + faker.lorem().word();
+        List<Artist> allArtists = artistRepository.findAll();
+        int numberOfArtists = random.nextInt(3) + 1;
+        Collections.shuffle(allArtists);
+        Track track = Track.builder()
+                .title(title)
+                .duration(random.nextInt(300))
+                .cover("https://placehold.co/600x400/"+color+ "/FFF" + "?text=" + String.valueOf(title.charAt(0)).toUpperCase())
+                .lyrics(faker.lorem().paragraph(5))
+                .status(faker.bool().bool())
+                .artists(allArtists.subList(0, numberOfArtists))
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .album(albumRepository.findAll().get(random.nextInt(albumRepository.findAll().size())))
+                .path("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3")
+                .build();
+        trackRepository.save(track);
 
-        }
+    }
     }
 
     @Test
@@ -103,7 +125,7 @@ class StellarPlayerApplicationTests {
         Random random = new Random();
         for (int i = 0; i < 10; i++) {
             String color = RandomColor.getRandomColor();
-            String name = faker.music().genre() + " " + faker.music().instrument();
+            String name = faker.book().title() + " " + (faker.app().name());
             List<Track> allTracks = trackRepository.findAll();
             int numberOfTracks = random.nextInt(10) + 1;
             Collections.shuffle(allTracks);
@@ -131,27 +153,7 @@ class StellarPlayerApplicationTests {
         System.out.println();
     }
 
-    @Test
-    void createAlbum() {
-        Faker faker = new Faker(new Locale("en-US"));
-        Random random = new Random();
-        for (int i = 0; i < 10; i++) {
-            String color = RandomColor.getRandomColor();
-            String name = faker.dune().character() +" " + faker.music().instrument();
-            List<Artist> allArtists = artistRepository.findAll();
-            int numberOfArtists = random.nextInt(3) + 1;
-            Collections.shuffle(allArtists);
-            Album album = Album.builder()
-                    .title(name)
-                    .cover("https://placehold.co/600x400/" + color + "/FFF" + "?text=" + String.valueOf(name.charAt(0)).toUpperCase())
-                    .status(true)
-                    .artists(allArtists.subList(0, numberOfArtists))
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
-                    .build();
-            albumRepository.save(album);
-        }
-    }
+
 
 
 }
