@@ -7,6 +7,7 @@ import org.gb.stellarplayer.Repository.PlaylistRepository;
 import org.gb.stellarplayer.Repository.UserRepository;
 import org.gb.stellarplayer.Service.AlbumService;
 import org.gb.stellarplayer.Service.PlaylistService;
+import org.gb.stellarplayer.Service.TrackService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,7 +21,8 @@ public class AlbumApi {
 
     @Autowired
     AlbumService playlistService;
-
+    @Autowired
+    TrackService trackService;
     private final PlaylistRepository playlistRepository;
     private final UserRepository userRepository;
 
@@ -33,4 +35,6 @@ public class AlbumApi {
     public Album getPlaylistById(@PathVariable int id) {
         return playlistService.getAlbumById(id);
     }
+
+
 }
