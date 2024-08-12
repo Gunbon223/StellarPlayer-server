@@ -4,12 +4,18 @@ import org.gb.stellarplayer.Entites.User;
 import org.gb.stellarplayer.Exception.BadRequestException;
 import org.gb.stellarplayer.Exception.ResourceNotFoundException;
 import org.gb.stellarplayer.Repository.UserRepository;
+import org.gb.stellarplayer.Request.UserUpdateRequest;
 import org.gb.stellarplayer.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 @Service
 public class UserServiceImplement implements UserService {
+    @Override
+    public User updateUser(UserUpdateRequest userUpdateRequest) {
+    return null;
+    }
+
     @Autowired
     UserRepository userRepository;
     @Override
