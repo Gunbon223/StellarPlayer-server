@@ -8,6 +8,8 @@ import org.gb.stellarplayer.Request.UserUpdateRequest;
 import org.gb.stellarplayer.Service.UserService;
 import org.gb.stellarplayer.Ultils.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @Log4j2
@@ -30,12 +32,14 @@ public class UserInfoApi {
     }
 
     @PostMapping("/update")
-    public User updateUserInfo(@RequestBody UserUpdateRequest user, @RequestHeader("Authorization") String token) {
-        String jwt = token.substring(7); // remove "Bearer " from the token
+    public ResponseEntity<?> updateUserInfo(@RequestBody UserUpdateRequest user, @RequestHeader("Authorization") String token) {
+        String jwt = token.substring(7);
         if (!jwtUtil.validateJwtToken(jwt)) {
-            throw new BadRequestException("Session expired! Please login again!");
+            return new ResponseEntity<>("Session expired! Please login again!", HttpStatus.BAD_REQUEST);
         }
-        return userService.updateUser(user);
+        userService.updateUser(user);
+        return new ResponseEntity<>(user, HttpStatus.CREATED); //tra ve 201
+
     }
 
 }
