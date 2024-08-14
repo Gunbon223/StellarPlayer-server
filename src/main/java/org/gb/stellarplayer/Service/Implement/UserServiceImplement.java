@@ -11,13 +11,16 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class UserServiceImplement implements UserService {
-    @Override
-    public User updateUser(UserUpdateRequest userUpdateRequest) {
-        return null;
-    }
-
     @Autowired
     UserRepository userRepository;
+
+    @Override
+    public User updateUser(UserUpdateRequest userUpdateRequest,int id) {
+        User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        user.setEmail(userUpdateRequest.getEmail());
+        return userRepository.save(user);
+    }
+
     @Override
     public User getUserByUsername(String username) {
         User user = userRepository.findByName(username).orElseThrow(() -> new ResourceNotFoundException("User not found"));

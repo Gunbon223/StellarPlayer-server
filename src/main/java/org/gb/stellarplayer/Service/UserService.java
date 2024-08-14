@@ -6,5 +6,5 @@ import org.gb.stellarplayer.Request.UserUpdateRequest;
 public interface UserService {
     User getUserByUsername(String username);
     User getUserById(int id);
-    User updateUser(UserUpdateRequest userUpdateRequest);
+    User updateUser(UserUpdateRequest userUpdateRequest, int id);
 }

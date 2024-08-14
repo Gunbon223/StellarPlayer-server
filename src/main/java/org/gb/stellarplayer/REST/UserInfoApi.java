@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 @Log4j2
 @RestController
 @RequestMapping("/api/v1/user")
+@CrossOrigin(origins = "http://localhost:3000")
 @RequiredArgsConstructor
 public class UserInfoApi {
     @Autowired
@@ -24,21 +25,21 @@ public class UserInfoApi {
     @GetMapping("/{id}")
     public User getUserInfo(@PathVariable int id, @RequestHeader("Authorization") String token) {
         log.info(token);
-        String jwt = token.substring(7); // remove "Bearer " from the token
+        String jwt = token.substring(7);
         if (!jwtUtil.validateJwtToken(jwt)) {
             throw new BadRequestException("Session expired! Please login again!");
         }
         return userService.getUserById(id);
     }
 
-    @PostMapping("/update")
-    public ResponseEntity<?> updateUserInfo(@RequestBody UserUpdateRequest user, @RequestHeader("Authorization") String token) {
+    @PostMapping("/{id}/update")
+    public ResponseEntity<?> updateUserInfo(@RequestBody UserUpdateRequest user, @RequestHeader("Authorization") String token,@PathVariable int id) {
         String jwt = token.substring(7);
         if (!jwtUtil.validateJwtToken(jwt)) {
             return new ResponseEntity<>("Session expired! Please login again!", HttpStatus.BAD_REQUEST);
         }
-        userService.updateUser(user);
-        return new ResponseEntity<>(user, HttpStatus.CREATED); //tra ve 201
+        userService.updateUser(user,id);
+        return new ResponseEntity<>(user, HttpStatus.OK); //tra ve 200
 
     }
 
