@@ -43,4 +43,15 @@ public class UserInfoApi {
 
     }
 
+    @PostMapping("/{id}/update/avatar")
+    public ResponseEntity<?> updateUserAvatar(@RequestBody UserUpdateRequest user, @RequestHeader("Authorization") String token,@PathVariable int id) {
+        String jwt = token.substring(7);
+        if (!jwtUtil.validateJwtToken(jwt)) {
+            return new ResponseEntity<>("Session expired! Please login again!", HttpStatus.BAD_REQUEST);
+        }
+        userService.updateUserAvatar(user,id);
+        return new ResponseEntity<>(user, HttpStatus.OK);
+
+    }
+
 }

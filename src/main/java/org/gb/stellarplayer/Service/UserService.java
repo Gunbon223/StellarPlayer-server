@@ -7,4 +7,5 @@ public interface UserService {
     User getUserByUsername(String username);
     User getUserById(int id);
     User updateUser(UserUpdateRequest userUpdateRequest, int id);
+    User updateUserAvatar(UserUpdateRequest userUpdateRequest, int id);
 }

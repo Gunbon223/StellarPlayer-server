@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.gb.stellarplayer.Model.Enum.EnumUserRole;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -26,6 +27,7 @@ public class User {
     String email;
     String password;
     String avatar;
+    LocalDate dob;
 
     @ManyToMany(fetch = FetchType.EAGER)
             @JoinTable(name = "user_role",

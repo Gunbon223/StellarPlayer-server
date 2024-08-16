@@ -9,6 +9,8 @@ import org.gb.stellarplayer.Service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
 @Service
 public class UserServiceImplement implements UserService {
     @Autowired
@@ -18,6 +20,15 @@ public class UserServiceImplement implements UserService {
     public User updateUser(UserUpdateRequest userUpdateRequest,int id) {
         User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         user.setEmail(userUpdateRequest.getEmail());
+        user.setUpdatedAt(LocalDateTime.now());
+        return userRepository.save(user);
+    }
+
+    @Override
+    public User updateUserAvatar(UserUpdateRequest userUpdateRequest, int id) {
+        User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        user.setAvatar(userUpdateRequest.getAvatar());
+        user.setUpdatedAt(LocalDateTime.now());
         return userRepository.save(user);
     }
 
