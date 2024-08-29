@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.gb.stellarplayer.Entites.User;
 import org.gb.stellarplayer.Exception.BadRequestException;
+import org.gb.stellarplayer.Request.UserUpdatePasswordRequest;
 import org.gb.stellarplayer.Request.UserUpdateRequest;
 import org.gb.stellarplayer.Service.UserService;
 import org.gb.stellarplayer.Ultils.JwtUtil;
@@ -51,7 +52,16 @@ public class UserInfoApi {
         }
         userService.updateUserAvatar(user,id);
         return new ResponseEntity<>(user, HttpStatus.OK);
+    }
 
+    @PostMapping("/{id}/update/password")
+    public ResponseEntity<?> updateUserPassword(@RequestBody UserUpdatePasswordRequest user, @RequestHeader("Authorization") String token, @PathVariable int id) {
+        String jwt = token.substring(7);
+        if (!jwtUtil.validateJwtToken(jwt)) {
+            return new ResponseEntity<>("Session expired! Please login again!", HttpStatus.BAD_REQUEST);
+        }
+        userService.updateUserPassword(user,id);
+        return new ResponseEntity<>(user, HttpStatus.OK);
     }
 
 }
