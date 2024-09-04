@@ -60,6 +60,9 @@ public class UserInfoApi {
         if (!jwtUtil.validateJwtToken(jwt)) {
             return new ResponseEntity<>("Session expired! Please login again!", HttpStatus.BAD_REQUEST);
         }
+        if (user.oldPassword == null || user.newPassword == null) {
+            return new ResponseEntity<>("Old password and new password must not be null", HttpStatus.BAD_REQUEST);
+        }
         userService.updateUserPassword(user,id);
         return new ResponseEntity<>(user, HttpStatus.OK);
     }

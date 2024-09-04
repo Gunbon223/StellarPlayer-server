@@ -3,7 +3,7 @@ package org.gb.stellarplayer.Model.Enum;
 public enum DateType {
     DAILY,
     MONTHLY
-    ,QUARTERLY,
+    ,HALF_YEAR,
     YEARLY
 
 }
