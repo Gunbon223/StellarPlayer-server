@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import org.gb.stellarplayer.Model.Enum.DateType;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Builder
@@ -21,6 +23,10 @@ public class Subscription {
     String name;
     @Enumerated(EnumType.STRING)
     DateType dateType;
+    String description;
+    @ElementCollection
+    @CollectionTable(name = "subscription_features", joinColumns = @JoinColumn(name = "subscription_id"))
+    List<String> features;
     Double price;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
