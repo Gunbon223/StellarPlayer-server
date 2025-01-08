@@ -23,6 +23,7 @@ public class Subscription {
     String name;
     @Enumerated(EnumType.STRING)
     DateType dateType;
+    String offer;
     String description;
     @ElementCollection
     @CollectionTable(name = "subscription_features", joinColumns = @JoinColumn(name = "subscription_id"))

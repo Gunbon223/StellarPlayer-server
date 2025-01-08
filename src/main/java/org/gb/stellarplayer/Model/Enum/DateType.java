@@ -5,5 +5,4 @@ public enum DateType {
     MONTHLY
     ,HALF_YEAR,
     YEARLY
-
 }

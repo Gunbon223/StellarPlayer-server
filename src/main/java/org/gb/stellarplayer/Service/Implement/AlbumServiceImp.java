@@ -21,6 +21,21 @@ public class AlbumServiceImp implements AlbumService
 
     @Override
     public Album getAlbumById(int id) {
-        return albumRepository.findById(id).orElseThrow(() ->new BadRequestException("Playlist not found"));
+        return albumRepository.findById(id).orElseThrow(() ->new BadRequestException("Album not found"));
+    }
+
+    @Override
+    public Album addAlbum(Album album) {
+        return null;
+    }
+
+    @Override
+    public Album updateAlbum(Album album) {
+        return null;
+    }
+
+    @Override
+    public Album deleteAlbum(int id) {
+        return null;
     }
 }

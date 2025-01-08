@@ -3,6 +3,7 @@ package org.gb.stellarplayer.REST;
 import lombok.RequiredArgsConstructor;
 import org.gb.stellarplayer.Entites.Album;
 import org.gb.stellarplayer.Entites.Playlist;
+import org.gb.stellarplayer.Entites.Track;
 import org.gb.stellarplayer.Repository.PlaylistRepository;
 import org.gb.stellarplayer.Repository.UserRepository;
 import org.gb.stellarplayer.Service.AlbumService;
@@ -23,8 +24,6 @@ public class AlbumApi {
     AlbumService playlistService;
     @Autowired
     TrackService trackService;
-    private final PlaylistRepository playlistRepository;
-    private final UserRepository userRepository;
 
     @GetMapping("/newest")
     public List<Album> getAllPlaylists() {
@@ -35,6 +34,12 @@ public class AlbumApi {
     public Album getPlaylistById(@PathVariable int id) {
         return playlistService.getAlbumById(id);
     }
+
+    @GetMapping("/{id}/tracks")
+    public List<Track> getTracksByAlbumId(@PathVariable int id) {
+        return trackService.getTrackByAlbumId(id);
+    }
+
 
 
 }
