@@ -23,6 +23,12 @@ public class SubscriptionApi {
         return new ResponseEntity<>(subscriptions, HttpStatus.OK);
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<Subscription> getSubscriptionById(@PathVariable int id) {
+        Subscription subscription = subscriptionService.getSubscriptionById(id);
+        return new ResponseEntity<>(subscription, HttpStatus.OK);
+    }
+
     @PostMapping
     public ResponseEntity<Subscription> addSubscription(@RequestBody SubscriptionRequest subscriptionRequest) {
         Subscription subscription = subscriptionService.addSubscription(subscriptionRequest);
@@ -34,6 +40,8 @@ public class SubscriptionApi {
         Subscription subscription = subscriptionService.updateSubscription(subscriptionRequest, id);
         return new ResponseEntity<>(subscription, HttpStatus.OK);
     }
+
+
 
 
 

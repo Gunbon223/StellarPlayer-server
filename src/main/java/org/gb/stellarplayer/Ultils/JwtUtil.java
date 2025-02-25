@@ -1,6 +1,7 @@
 package org.gb.stellarplayer.Ultils;
 
 import io.jsonwebtoken.*;
+import org.gb.stellarplayer.Exception.BadRequestException;
 import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.log4j.Log4j2;
 import org.gb.stellarplayer.Service.Implement.UserDetailsImplement;
@@ -17,7 +18,7 @@ public class JwtUtil {
     private String secret;
 
     @Value("${stellarplayer.app.jwtExpirationMs}")
-    private int expirationMs;
+    private long expirationMs;
 
     public String generateJwtToken(Authentication authentication) {
         UserDetailsImplement userDetails = (UserDetailsImplement) authentication.getPrincipal();
@@ -33,20 +34,22 @@ public class JwtUtil {
         return Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody().getSubject();
     }
 
-    public boolean validateJwtToken(String authToken) {
+    public void validateJwtToken(String authToken) {
         try {
             Jwts.parser().setSigningKey(secret).parseClaimsJws(authToken);
-            return true;
         } catch (MalformedJwtException e) {
             log.error("Invalid JWT token: {}", e.getMessage());
+            throw new BadRequestException("Invalid JWT token: " + e.getMessage());
         } catch (ExpiredJwtException e) {
             log.error("JWT token is expired: {}", e.getMessage());
+            throw new BadRequestException("JWT token is expired: " + e.getMessage());
         } catch (UnsupportedJwtException e) {
             log.error("JWT token is unsupported: {}", e.getMessage());
+            throw new BadRequestException("JWT token is unsupported: " + e.getMessage());
         } catch (IllegalArgumentException e) {
             log.error("JWT claims string is empty: {}", e.getMessage());
+            throw new BadRequestException("JWT claims string is empty: " + e.getMessage());
         }
-        return false;
     }
 
 

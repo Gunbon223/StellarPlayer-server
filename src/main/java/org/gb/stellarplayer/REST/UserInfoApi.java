@@ -27,18 +27,14 @@ public class UserInfoApi {
     public User getUserInfo(@PathVariable int id, @RequestHeader("Authorization") String token) {
         log.info(token);
         String jwt = token.substring(7);
-        if (!jwtUtil.validateJwtToken(jwt)) {
-            throw new BadRequestException("Session expired! Please login again!");
-        }
+        jwtUtil.validateJwtToken(jwt);
         return userService.getUserById(id);
     }
 
     @PostMapping("/{id}/update")
     public ResponseEntity<?> updateUserInfo(@RequestBody UserUpdateRequest user, @RequestHeader("Authorization") String token,@PathVariable int id) {
         String jwt = token.substring(7);
-        if (!jwtUtil.validateJwtToken(jwt)) {
-            return new ResponseEntity<>("Session expired! Please login again!", HttpStatus.BAD_REQUEST);
-        }
+        jwtUtil.validateJwtToken(jwt);
         userService.updateUser(user,id);
         return new ResponseEntity<>(user, HttpStatus.OK); //tra ve 200
 
@@ -47,9 +43,7 @@ public class UserInfoApi {
     @PostMapping("/{id}/update/avatar")
     public ResponseEntity<?> updateUserAvatar(@RequestBody UserUpdateRequest user, @RequestHeader("Authorization") String token,@PathVariable int id) {
         String jwt = token.substring(7);
-        if (!jwtUtil.validateJwtToken(jwt)) {
-            return new ResponseEntity<>("Session expired! Please login again!", HttpStatus.BAD_REQUEST);
-        }
+        jwtUtil.validateJwtToken(jwt);
         userService.updateUserAvatar(user,id);
         return new ResponseEntity<>(user, HttpStatus.OK);
     }
@@ -57,9 +51,7 @@ public class UserInfoApi {
     @PostMapping("/{id}/update/password")
     public ResponseEntity<?> updateUserPassword(@RequestBody UserUpdatePasswordRequest user, @RequestHeader("Authorization") String token, @PathVariable int id) {
         String jwt = token.substring(7);
-        if (!jwtUtil.validateJwtToken(jwt)) {
-            return new ResponseEntity<>("Session expired! Please login again!", HttpStatus.BAD_REQUEST);
-        }
+        jwtUtil.validateJwtToken(jwt);
         if (user.oldPassword == null || user.newPassword == null) {
             return new ResponseEntity<>("Old password and new password must not be null", HttpStatus.BAD_REQUEST);
         }

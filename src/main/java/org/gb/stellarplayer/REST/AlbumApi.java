@@ -21,25 +21,24 @@ import java.util.List;
 public class AlbumApi {
 
     @Autowired
-    AlbumService playlistService;
+    AlbumService albumService;
     @Autowired
     TrackService trackService;
 
     @GetMapping("/newest")
     public List<Album> getAllPlaylists() {
-        return playlistService.getAlbums();
+        return albumService.getAlbums();
     }
 
     @GetMapping("/{id}")
     public Album getPlaylistById(@PathVariable int id) {
-        return playlistService.getAlbumById(id);
+        return albumService.getAlbumById(id);
     }
 
     @GetMapping("/{id}/tracks")
     public List<Track> getTracksByAlbumId(@PathVariable int id) {
         return trackService.getTrackByAlbumId(id);
     }
-
 
 
 }

@@ -10,5 +10,5 @@ public interface SubscriptionService {
     Subscription addSubscription(SubscriptionRequest sr);
     Subscription updateSubscription(SubscriptionRequest sr,int id);
     Subscription deleteSubscription(int id);
-
+    Subscription getSubscriptionById(int id);
 }

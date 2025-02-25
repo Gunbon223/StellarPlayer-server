@@ -2,6 +2,7 @@ package org.gb.stellarplayer.Service.Implement;
 
 import org.gb.stellarplayer.Entites.Subscription;
 import org.gb.stellarplayer.Exception.BadRequestException;
+import org.gb.stellarplayer.Exception.ResourceNotFoundException;
 import org.gb.stellarplayer.Model.Enum.DateType;
 import org.gb.stellarplayer.Repository.SubscriptionRepository;
 import org.gb.stellarplayer.Request.SubscriptionRequest;
@@ -46,7 +47,7 @@ public class SubscriptionServiceImp implements SubscriptionService {
     @Override
     public Subscription updateSubscription(SubscriptionRequest sr, int id) {
         if (!subscriptionRepository.findById(id).isPresent()) {
-            throw new BadRequestException("Subscription not found");
+            throw new ResourceNotFoundException("Subscription not found");
         }
         Subscription subscription = subscriptionRepository.findById(id).get();
         DateType dateType = DateType.valueOf(sr.getDateType().toUpperCase());
@@ -62,8 +63,19 @@ public class SubscriptionServiceImp implements SubscriptionService {
 
     @Override
     public Subscription deleteSubscription(int id) {
+        if (!subscriptionRepository.findById(id).isPresent()) {
+            throw new ResourceNotFoundException("Subscription not found");
+        }
         Subscription subscription = subscriptionRepository.findById(id).get();
         subscriptionRepository.delete(subscription);
         return subscription;
+    }
+
+    @Override
+    public Subscription getSubscriptionById(int id) {
+        if (!subscriptionRepository.findById(id).isPresent()) {
+            throw new ResourceNotFoundException("Subscription not found");
+        }
+        return subscriptionRepository.findById(id).get();
     }
 }

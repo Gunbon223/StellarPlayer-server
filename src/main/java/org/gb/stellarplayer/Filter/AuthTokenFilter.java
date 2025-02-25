@@ -29,7 +29,8 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         try {
             String jwt = parseJwt(request);
-            if (jwt != null && jwtUtil.validateJwtToken(jwt)) {
+            if (jwt != null) {
+                jwtUtil.validateJwtToken(jwt); // This will throw an exception if the token is invalid or expired
                 String username = jwtUtil.getUserNameFromJwtToken(jwt);
 
                 UserDetailsImplement userDetails = (UserDetailsImplement) userDetailService.loadUserByUsername(username);
@@ -38,7 +39,6 @@ public class AuthTokenFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         } catch (Exception e) {
-            log.error("Cannot set user authentication: {}", e);
         }
         filterChain.doFilter(request, response);
 
