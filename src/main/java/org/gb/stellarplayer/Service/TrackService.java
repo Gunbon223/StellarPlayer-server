@@ -8,4 +8,8 @@ public interface TrackService  {
     List<Track> getTracks();
     Track getTrackById(int id);
     List<Track> getTrackByAlbumId(int id);
+    Track saveTrack(Track track);
+    void deleteTrack(int id);
+    Track updateTrack(Track track);
+
 }

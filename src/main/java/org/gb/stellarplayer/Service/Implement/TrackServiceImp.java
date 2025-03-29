@@ -31,4 +31,21 @@ public class TrackServiceImp implements TrackService {
     public List<Track> getTrackByAlbumId(int id) {
         return trackRepository.findByAlbumId(id);
     }
+
+    @Override
+    public Track saveTrack(Track track) {
+        return trackRepository.save(track);
+    }
+
+    @Override
+    public void deleteTrack(int id) {
+
+    }
+
+    @Override
+    public Track updateTrack(Track track) {
+        return null;
+    }
+
+
 }

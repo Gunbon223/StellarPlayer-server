@@ -12,10 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @SpringBootTest
@@ -97,7 +94,7 @@ class StellarPlayerApplicationTests {
         Faker faker = new Faker(new Locale("en-US"));
         Random random = new Random();
         String color = RandomColor.getRandomColor();
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < 90; i++) {
         String title = faker.hipster().word() + " " + faker.music().genre() + " " + faker.lorem().word();
         List<Artist> allArtists = artistRepository.findAll();
         int numberOfArtists = random.nextInt(3) + 1;
@@ -142,8 +139,12 @@ class StellarPlayerApplicationTests {
         }
     }
 
+    List<String> paths = new ArrayList<>();
+    
+
     @Test
     void fakerTest() {
+
         Faker faker = new Faker(new Locale("en-US"));
         System.out.println(faker.artist().name());
         System.out.println(faker.music().genre());
