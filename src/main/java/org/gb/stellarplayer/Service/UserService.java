@@ -10,4 +10,5 @@ public interface UserService {
     User updateUser(UserUpdateRequest userUpdateRequest, int id);
     User updateUserAvatar(UserUpdateRequest userUpdateRequest, int id);
     User updateUserPassword(UserUpdatePasswordRequest userUpdateRequest, int id);
+    User getSubscribedUserById(int id);
 }

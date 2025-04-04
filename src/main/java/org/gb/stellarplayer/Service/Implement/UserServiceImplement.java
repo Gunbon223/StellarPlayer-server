@@ -48,6 +48,15 @@ public class UserServiceImplement implements UserService {
     }
 
     @Override
+    public User getSubscribedUserById(int id) {
+//        User user = userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+//        if (user.getSubscription() == null) {
+//            throw new BadRequestException("User not subscribed");
+//        }
+        return userRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("User not found"));
+    }
+
+    @Override
     public User getUserByUsername(String username) {
         User user = userRepository.findByName(username).orElseThrow(() -> new ResourceNotFoundException("User not found"));
         user.setPassword(null);

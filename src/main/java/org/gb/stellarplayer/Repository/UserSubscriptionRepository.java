@@ -9,4 +9,5 @@ import java.util.Optional;
 
 public interface UserSubscriptionRepository extends JpaRepository<UserSubscription, Integer> {
     Optional<UserSubscription> findByUser(User user);
+
 }

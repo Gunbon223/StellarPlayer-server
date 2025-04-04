@@ -4,9 +4,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.gb.stellarplayer.Entites.User;
 import org.gb.stellarplayer.Exception.BadRequestException;
+import org.gb.stellarplayer.Repository.UserSubscriptionRepository;
 import org.gb.stellarplayer.Request.UserUpdatePasswordRequest;
 import org.gb.stellarplayer.Request.UserUpdateRequest;
 import org.gb.stellarplayer.Service.UserService;
+import org.gb.stellarplayer.Service.UserSubscriptionService;
 import org.gb.stellarplayer.Ultils.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -21,6 +23,8 @@ import org.springframework.web.bind.annotation.*;
 public class UserInfoApi {
     @Autowired
     UserService userService;
+    @Autowired
+    UserSubscriptionService userSubscriptionService;
     @Autowired
     JwtUtil jwtUtil;
     @GetMapping("/{id}")
@@ -57,6 +61,13 @@ public class UserInfoApi {
         }
         userService.updateUserPassword(user,id);
         return new ResponseEntity<>(user, HttpStatus.OK);
+    }
+
+    @GetMapping("/{id}/subscription")
+    public ResponseEntity<?> getUserSubscription(@PathVariable int id, @RequestHeader("Authorization") String token) {
+        String jwt = token.substring(7);
+        jwtUtil.validateJwtToken(jwt);
+        return new ResponseEntity<>(userSubscriptionService.getUserSubscriptionByUserId(id), HttpStatus.OK);
     }
 
 }

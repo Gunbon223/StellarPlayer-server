@@ -27,7 +27,22 @@ public class UserSubscriptionServiceImp implements UserSubscriptionService {
     @Override
     public UserSubscription getUserSubscriptionByUserId(int user_id) {
         User user = userRepository.findById(user_id).orElseThrow(() -> new BadRequestException("User not found"));
-        return userSubscriptionRepository.findByUser(user).orElseThrow(() -> new BadRequestException("User Subscription not found!User dont have subscription"));
+
+        return userSubscriptionRepository.findByUser(user)
+                .orElseGet(() -> {
+                    // Create a free plan subscription object
+                    UserSubscription freePlan = new UserSubscription();
+                    freePlan.setUser(user);
+                    freePlan.setSubscription(null); // Or set to a default free subscription if available
+                    freePlan.setActive(true);
+                    freePlan.setStartDate(LocalDateTime.now());
+                    freePlan.setEndDate(null); // No end date for free plan
+                    freePlan.setCreatedAt(LocalDateTime.now());
+                    freePlan.setUpdatedAt(LocalDateTime.now());
+                    // Don't save this to the repository as it's just a temporary object
+
+                    return freePlan;
+                });
     }
 
     @Override
