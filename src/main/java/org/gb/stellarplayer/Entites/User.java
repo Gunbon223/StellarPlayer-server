@@ -5,7 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.gb.stellarplayer.Model.Enum.EnumUserRole;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -39,7 +38,7 @@ public class User {
     LocalDateTime updatedAt;
 
     @OneToMany(mappedBy = "user")
-    private List<Favorite> favorites;
+    private List<Favourite> favorites;
 
 
 

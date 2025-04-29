@@ -13,15 +13,13 @@ import java.time.LocalDateTime;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "favorite")
-public class Favorite {
+@Table(name = "favourite")
+public class Favourite {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
-
     @ManyToOne
     User user;
-
     @ManyToOne
     Playlist playlist;
     @ManyToOne

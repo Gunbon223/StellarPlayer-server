@@ -1,5 +1,6 @@
 package org.gb.stellarplayer.Service.Implement;
 
+import org.gb.stellarplayer.Entites.Subscription;
 import org.gb.stellarplayer.Entites.User;
 import org.gb.stellarplayer.Entites.UserSubscription;
 import org.gb.stellarplayer.Exception.BadRequestException;
@@ -10,6 +11,7 @@ import org.gb.stellarplayer.Service.UserSubscriptionService;
 import org.gb.stellarplayer.Ultils.DateTypeToNum;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,49 +26,84 @@ public class UserSubscriptionServiceImp implements UserSubscriptionService {
     SubscriptionRepository subscriptionRepository;
 
 
+
+
+
+
     @Override
+    @Transactional
     public UserSubscription getUserSubscriptionByUserId(int user_id) {
         User user = userRepository.findById(user_id).orElseThrow(() -> new BadRequestException("User not found"));
 
-        return userSubscriptionRepository.findByUser(user)
-                .orElseGet(() -> {
-                    // Create a free plan subscription object
-                    UserSubscription freePlan = new UserSubscription();
-                    freePlan.setUser(user);
-                    freePlan.setSubscription(null); // Or set to a default free subscription if available
-                    freePlan.setActive(true);
-                    freePlan.setStartDate(LocalDateTime.now());
-                    freePlan.setEndDate(null); // No end date for free plan
-                    freePlan.setCreatedAt(LocalDateTime.now());
-                    freePlan.setUpdatedAt(LocalDateTime.now());
-                    // Don't save this to the repository as it's just a temporary object
+        // Get active subscriptions ordered by end date (most recent first)
+        List<UserSubscription> activeSubscriptions = userSubscriptionRepository.findActiveSubscriptionsByUserOrderByEndDateDesc(user);
 
-                    return freePlan;
-                });
-    }
+        // Check if any subscriptions have expired
+        LocalDateTime now = LocalDateTime.now();
+        boolean hasExpired = false;
 
-    @Override
-    public List<UserSubscription> getAllUserSubscription() {
-        return userSubscriptionRepository.findAll();
-    }
-
-    @Override
-    public UserSubscription addUserSubscription(int user_id, int subscription_id) {
-        if (userRepository.findById(user_id).isPresent() && subscriptionRepository.findById(subscription_id).isPresent()) {
-            int daySub = DateTypeToNum.convert(subscriptionRepository.findById(subscription_id).get().getDateType());
-            UserSubscription userSubscription = new UserSubscription().builder()
-                    .user(userRepository.findById(user_id).get())
-                    .subscription(subscriptionRepository.findById(subscription_id).get())
-                    .createdAt(LocalDateTime.now())
-                    .updatedAt(LocalDateTime.now())
-                    .isActive(true)
-                    .startDate(LocalDateTime.now())
-                    .endDate(LocalDateTime.now().plusDays(daySub))
-                    .build();
-            return userSubscriptionRepository.save(userSubscription);
-        } else {
-            throw new BadRequestException("User or Subscription not found");
+        for (UserSubscription subscription : activeSubscriptions) {
+            if (subscription.getEndDate() != null && subscription.getEndDate().isBefore(now)) {
+                // Update the subscription to inactive
+                subscription.setActive(false);
+                subscription.setUpdatedAt(now);
+                userSubscriptionRepository.save(subscription);
+                hasExpired = true;
+            }
         }
+
+        // If any subscriptions have expired, create a free plan subscription
+        if (hasExpired) {
+        }
+
+        // Get the updated list of active subscriptions
+        activeSubscriptions = userSubscriptionRepository.findActiveSubscriptionsByUserOrderByEndDateDesc(user);
+
+        // Return the first one (most recent) or null if none exists
+        if (!activeSubscriptions.isEmpty()) {
+            return activeSubscriptions.get(0);
+        } else {
+            // Return null to indicate no active subscription
+            return null;
+        }
+    }
+
+
+
+    @Override
+    @Transactional
+    public UserSubscription addUserSubscription(int user_id, int subscription_id) {
+        User user = userRepository.findById(user_id)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+
+        Subscription subscription = subscriptionRepository.findById(subscription_id)
+                .orElseThrow(() -> new BadRequestException("Subscription not found"));
+
+        // Deactivate any existing active subscriptions for this user
+        List<UserSubscription> activeSubscriptions = userSubscriptionRepository.findByUserAndIsActiveTrue(user);
+        LocalDateTime now = LocalDateTime.now();
+
+        for (UserSubscription existingSubscription : activeSubscriptions) {
+            existingSubscription.setActive(false);
+            existingSubscription.setUpdatedAt(now);
+            userSubscriptionRepository.save(existingSubscription);
+        }
+
+        // Calculate subscription duration based on date type
+        int daySub = DateTypeToNum.convert(subscription.getDateType());
+
+        // Create and save the new subscription
+        UserSubscription userSubscription = new UserSubscription().builder()
+                .user(user)
+                .subscription(subscription)
+                .createdAt(now)
+                .updatedAt(now)
+                .isActive(true)
+                .startDate(now)
+                .endDate(now.plusDays(daySub))
+                .build();
+
+        return userSubscriptionRepository.save(userSubscription);
     }
 
 
@@ -79,4 +116,5 @@ public class UserSubscriptionServiceImp implements UserSubscriptionService {
     public UserSubscription deleteUserSubscription(String username) {
         return null;
     }
+
 }

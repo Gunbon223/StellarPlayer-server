@@ -7,6 +7,7 @@ import org.gb.stellarplayer.Entites.User;
 import org.gb.stellarplayer.Model.Enum.EnumUserRole;
 import org.gb.stellarplayer.Repository.RoleRepository;
 import org.gb.stellarplayer.Repository.UserRepository;
+import org.gb.stellarplayer.Service.UserSubscriptionService;
 import org.gb.stellarplayer.Request.LoginRequest;
 import org.gb.stellarplayer.Request.RegisterRequest;
 import org.gb.stellarplayer.Response.JwtResponse;
@@ -42,6 +43,8 @@ public class AuthController {
     private JwtUtil jwtUtil;
     @Autowired
     private RoleRepository roleRepository;
+    @Autowired
+    private UserSubscriptionService userSubscriptionService;
 
 
     @PostMapping("/login")
@@ -81,6 +84,7 @@ public class AuthController {
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
         userRepository.save(user);
+
         return ResponseEntity.ok("User registered successfully!");
     }
 }

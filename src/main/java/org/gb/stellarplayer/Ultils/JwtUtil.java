@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.security.SignatureException;
 import java.util.Date;
+import java.util.List;
 
 @Component
 @Log4j2
@@ -22,10 +23,17 @@ public class JwtUtil {
 
     public String generateJwtToken(Authentication authentication) {
         UserDetailsImplement userDetails = (UserDetailsImplement) authentication.getPrincipal();
+
+        // Extract roles
+        List<String> roles = userDetails.getAuthorities().stream()
+                .map(item -> item.getAuthority())
+                .toList();
+
         return Jwts.builder()
                 .setSubject((userDetails.getUsername()))
                 .setIssuedAt(new Date())
                 .setExpiration(new Date((new Date()).getTime() + expirationMs))
+                .claim("roles", roles)  // Add roles as a claim
                 .signWith(SignatureAlgorithm.HS512, secret)
                 .compact();
     }
@@ -50,6 +58,21 @@ public class JwtUtil {
             log.error("JWT claims string is empty: {}", e.getMessage());
             throw new BadRequestException("JWT claims string is empty: " + e.getMessage());
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<String> getRolesFromJwtToken(String token) {
+        try {
+            Claims claims = Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody();
+            return (List<String>) claims.get("roles");
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    public boolean hasAdminRole(String token) {
+        List<String> roles = getRolesFromJwtToken(token);
+        return roles.contains("ROLE_ADMIN");
     }
 
 
