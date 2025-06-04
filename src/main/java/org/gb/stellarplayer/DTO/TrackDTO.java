@@ -1,0 +1,43 @@
+package org.gb.stellarplayer.DTO;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.gb.stellarplayer.Entites.Artist;
+import org.gb.stellarplayer.Entites.Track;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class TrackDTO {
+    private Integer id;
+    private String title;
+    private int duration;
+    private boolean status;
+    private String path;
+    private String cover;
+    private String lyrics;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private List<Artist> artists;
+
+    public static TrackDTO fromEntity(Track track) {
+        return TrackDTO.builder()
+                .id(track.getId())
+                .title(track.getTitle())
+                .duration(track.getDuration())
+                .status(track.isStatus())
+                .path(track.getPath())
+                .cover(track.getCover())
+                .lyrics(track.getLyrics())
+                .createdAt(track.getCreatedAt())
+                .updatedAt(track.getUpdatedAt())
+                .artists(track.getArtists())
+                .build();
+    }
+} 

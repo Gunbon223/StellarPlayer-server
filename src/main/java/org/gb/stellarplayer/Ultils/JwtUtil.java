@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.security.SignatureException;
 import java.util.Date;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @Log4j2
@@ -24,27 +25,36 @@ public class JwtUtil {
     public String generateJwtToken(Authentication authentication) {
         UserDetailsImplement userDetails = (UserDetailsImplement) authentication.getPrincipal();
 
-        // Extract roles
+        // Extract roles and ensure they have ROLE_ prefix
         List<String> roles = userDetails.getAuthorities().stream()
-                .map(item -> item.getAuthority())
+                .map(item -> {
+                    String role = item.getAuthority();
+                    return role.startsWith("ROLE_") ? role : "ROLE_" + role;
+                })
                 .toList();
+        
+        log.debug("Generating JWT token for user: {} with roles: {}", userDetails.getUsername(), roles);
 
         return Jwts.builder()
                 .setSubject((userDetails.getUsername()))
                 .setIssuedAt(new Date())
                 .setExpiration(new Date((new Date()).getTime() + expirationMs))
-                .claim("roles", roles)  // Add roles as a claim
+                .claim("roles", roles)
                 .signWith(SignatureAlgorithm.HS512, secret)
                 .compact();
     }
 
     public String getUserNameFromJwtToken(String token) {
-        return Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody().getSubject();
+        String username = Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody().getSubject();
+        log.debug("Extracted username from token: {}", username);
+        return username;
     }
 
     public void validateJwtToken(String authToken) {
+        log.debug("Validating JWT token...");
         try {
-            Jwts.parser().setSigningKey(secret).parseClaimsJws(authToken);
+            Claims claims = Jwts.parser().setSigningKey(secret).parseClaimsJws(authToken).getBody();
+            log.debug("Token validation successful. Claims: {}", claims);
         } catch (MalformedJwtException e) {
             log.error("Invalid JWT token: {}", e.getMessage());
             throw new BadRequestException("Invalid JWT token: " + e.getMessage());
@@ -64,17 +74,30 @@ public class JwtUtil {
     public List<String> getRolesFromJwtToken(String token) {
         try {
             Claims claims = Jwts.parser().setSigningKey(secret).parseClaimsJws(token).getBody();
-            return (List<String>) claims.get("roles");
+            List<String> roles = (List<String>) claims.get("roles");
+            // Ensure roles have ROLE_ prefix
+            roles = roles.stream()
+                .map(role -> role.startsWith("ROLE_") ? role : "ROLE_" + role)
+                .collect(Collectors.toList());
+            log.debug("Extracted roles from token: {}", roles);
+            return roles != null ? roles : List.of();
         } catch (Exception e) {
+            log.error("Error getting roles from token: {}", e.getMessage());
             return List.of();
         }
     }
 
     public boolean hasAdminRole(String token) {
         List<String> roles = getRolesFromJwtToken(token);
-        return roles.contains("ROLE_ADMIN");
+        boolean isAdmin = roles.contains("ROLE_ADMIN");
+        log.debug("Checking admin role. Roles: {}, Is Admin: {}", roles, isAdmin);
+        return isAdmin;
     }
 
-
-
+    public boolean hasArtistRole(String token) {
+        List<String> roles = getRolesFromJwtToken(token);
+        boolean isArtist = roles.contains("ROLE_ARTIST");
+        log.debug("Checking artist role. Roles: {}, Is Artist: {}", roles, isArtist);
+        return isArtist;
+    }
 }

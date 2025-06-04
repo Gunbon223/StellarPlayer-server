@@ -1,5 +1,6 @@
 package org.gb.stellarplayer.Service.Implement;
 
+import org.gb.stellarplayer.DTO.TrackAdminDTO;
 import org.gb.stellarplayer.Entites.Album;
 import org.gb.stellarplayer.Entites.Track;
 import org.gb.stellarplayer.Exception.BadRequestException;
@@ -8,10 +9,18 @@ import org.gb.stellarplayer.Repository.TrackRepository;
 import org.gb.stellarplayer.Service.AlbumService;
 import org.gb.stellarplayer.Service.TrackService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
 @Service
 public class TrackServiceImp implements TrackService {
     @Autowired
@@ -61,40 +70,91 @@ public class TrackServiceImp implements TrackService {
         // Verify track exists
         Track existingTrack = getTrackById(track.getId());
         
-        // Update all fields
+        // Update only non-null fields
         if (track.getTitle() != null) {
             existingTrack.setTitle(track.getTitle());
         }
-        
-        if (track.getDuration() > 0) {
-            existingTrack.setDuration(track.getDuration());
-        }
-        
         if (track.getPath() != null) {
             existingTrack.setPath(track.getPath());
         }
-        
+        if (track.getDuration() != 0) {
+            existingTrack.setDuration(track.getDuration());
+        }
         if (track.getCover() != null) {
             existingTrack.setCover(track.getCover());
         }
-        
         if (track.getLyrics() != null) {
             existingTrack.setLyrics(track.getLyrics());
         }
         
+        // Update the status and play count
+        existingTrack.setStatus(track.isStatus());
+        if (track.getPlayCount() != null) {
+            existingTrack.setPlayCount(track.getPlayCount());
+        }
+        
+        // Update album if specified
         if (track.getAlbum() != null && track.getAlbum().getId() != null) {
             Album album = albumRepository.findById(track.getAlbum().getId())
                 .orElseThrow(() -> new BadRequestException("Album not found with id: " + track.getAlbum().getId()));
             existingTrack.setAlbum(album);
         }
         
-        if (track.getArtists() != null && !track.getArtists().isEmpty()) {
+        // Update artists if specified
+        if (track.getArtists() != null) {
             existingTrack.setArtists(track.getArtists());
         }
         
-        existingTrack.setStatus(track.isStatus());
+        // Update genres if specified
+        if (track.getGenres() != null) {
+            existingTrack.setGenres(track.getGenres());
+        }
+        
+        // Update timestamp
         existingTrack.setUpdatedAt(LocalDateTime.now());
         
         return trackRepository.save(existingTrack);
     }
+    
+    @Override
+    public Map<String, Object> getPaginatedTracks(int page, int pageSize, String sortBy, boolean ascending) {
+        // Validate sorting field
+        String sortField = "id"; // Default sort field
+        
+        // Map the sortBy parameter to the actual field name
+        if ("title".equalsIgnoreCase(sortBy)) {
+            sortField = "title";
+        } else if ("artistName".equalsIgnoreCase(sortBy)) {
+            // For artist name, we will need to handle this in memory since it's a relationship
+            sortField = "id"; // We'll sort by ID and handle artist sorting later
+        }
+        
+        // Create pageable object with sorting
+        Sort.Direction direction = ascending ? Sort.Direction.ASC : Sort.Direction.DESC;
+        Pageable pageable = PageRequest.of(page, pageSize, Sort.by(direction, sortField));
+        
+        // Get paginated tracks
+        Page<Track> trackPage = trackRepository.findAll(pageable);
+        
+        // Convert to DTOs
+        List<TrackAdminDTO> tracks = trackPage.getContent().stream()
+            .map(TrackAdminDTO::fromEntity)
+            .collect(Collectors.toList());
+        
+
+        
+        // Create response with pagination metadata
+        Map<String, Object> response = new HashMap<>();
+        response.put("tracks", tracks);
+        response.put("currentPage", trackPage.getNumber());
+        response.put("totalItems", trackPage.getTotalElements());
+        response.put("totalPages", trackPage.getTotalPages());
+        
+        return response;
+    }
+    
+    /**
+     * Helper method to compare track DTOs by artist name
+     */
+
 }

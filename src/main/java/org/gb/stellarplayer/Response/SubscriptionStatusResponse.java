@@ -26,7 +26,7 @@ public class SubscriptionStatusResponse {
     public static SubscriptionStatusResponse noSubscription() {
         return SubscriptionStatusResponse.builder()
                 .hasActiveSubscription(false)
-                .message("You don't have an active subscription. Please purchase a subscription to access premium features.")
+                .message("Free User")
                 .subscription(null)
                 .build();
     }

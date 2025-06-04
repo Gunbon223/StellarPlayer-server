@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -22,6 +23,7 @@ public class Album {
     String title;
     String cover;
     boolean status;
+    LocalDate releaseDate;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 

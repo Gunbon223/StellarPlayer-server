@@ -37,8 +37,6 @@ public class User {
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 
-    @OneToMany(mappedBy = "user")
-    private List<Favourite> favorites;
 
 
 
