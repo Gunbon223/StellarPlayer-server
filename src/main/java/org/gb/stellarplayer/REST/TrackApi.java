@@ -2,24 +2,28 @@ package org.gb.stellarplayer.REST;
 
 import lombok.RequiredArgsConstructor;
 import org.gb.stellarplayer.Entites.Track;
+import org.gb.stellarplayer.Exception.BadRequestException;
+import org.gb.stellarplayer.Request.TrackRequest;
 import org.gb.stellarplayer.Service.TrackService;
+import org.gb.stellarplayer.Ultils.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import jakarta.servlet.http.HttpServletRequest;
-
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"})
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/api/v1/track")
 @RequiredArgsConstructor
 public class TrackApi {
     @Autowired
     TrackService trackService;
+    
+    @Autowired
+    private JwtUtil jwtUtil;
     
     @GetMapping("/{id}")
     public Track getTrackById(@PathVariable int id) {
@@ -30,130 +34,99 @@ public class TrackApi {
     public List<Track> getTracksByAlbumId(@PathVariable int id) {
         return trackService.getTrackByAlbumId(id);
     }
-    
-    /**
-     * Get track play count and basic statistics - No authentication required
-     * @param id Track ID
-     * @return Track play count and basic stats
-     */
-    @GetMapping("/{id}/stats")
-    public ResponseEntity<Map<String, Object>> getTrackStats(@PathVariable int id) {
+
+    @PostMapping
+    public ResponseEntity<?> addTrack(@RequestBody TrackRequest trackRequest, 
+                                     @RequestHeader("Authorization") String token) {
+        // Validate token and check admin role
+        if (!validateAdminToken(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access denied. Admin privileges required"));
+        }
+        
         try {
-            Track track = trackService.getTrackById(id);
-            
-            Map<String, Object> stats = new HashMap<>();
-            stats.put("trackId", track.getId());
-            stats.put("title", track.getTitle());
-            stats.put("playCount", track.getPlayCount());
-            stats.put("lastPlayedAt", track.getLastPlayedAt());
-            stats.put("likes", track.getLikes());
-            stats.put("shares", track.getShares());
-            stats.put("comments", track.getComments());
-            stats.put("duration", track.getDuration());
-            
-            // Add engagement metrics
-            Map<String, Object> engagement = new HashMap<>();
-            engagement.put("totalInteractions", track.getLikes() + track.getShares() + track.getComments());
-            engagement.put("likesPerPlay", track.getPlayCount() > 0 ? 
-                (double) track.getLikes() / track.getPlayCount() : 0.0);
-            engagement.put("sharesPerPlay", track.getPlayCount() > 0 ? 
-                (double) track.getShares() / track.getPlayCount() : 0.0);
-            
-            stats.put("engagement", engagement);
-            
-            return ResponseEntity.ok(stats);
+            Track savedTrack = trackService.saveTrack(convertRequestToTrack(trackRequest));
+            return ResponseEntity.status(HttpStatus.CREATED).body(savedTrack);
         } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("error", "Track not found");
-            error.put("message", e.getMessage());
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to create track: " + e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateTrack(@PathVariable int id, 
+                                        @RequestBody TrackRequest trackRequest,
+                                        @RequestHeader("Authorization") String token) {
+        // Validate token and check admin role
+        if (!validateAdminToken(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access denied. Admin privileges required"));
+        }
+        
+        try {
+            // First check if track exists
+            Track existingTrack = trackService.getTrackById(id);
+            
+            // Convert request to track and set id
+            Track trackToUpdate = convertRequestToTrack(trackRequest);
+            trackToUpdate.setId(id);
+            
+            // Update track
+            Track updatedTrack = trackService.updateTrack(trackToUpdate);
+            return ResponseEntity.ok(updatedTrack);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to update track: " + e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteTrack(@PathVariable int id,
+                                        @RequestHeader("Authorization") String token) {
+        // Validate token and check admin role
+        if (!validateAdminToken(token)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Access denied. Admin privileges required"));
+        }
+        
+        try {
+            trackService.deleteTrack(id);
+            return ResponseEntity.ok(Map.of("message", "Track deleted successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to delete track: " + e.getMessage()));
         }
     }
     
     /**
-     * Get basic play count only - No authentication required
-     * @param id Track ID
-     * @return Simple play count response
+     * Helper method to validate token and check for admin role
      */
-    @GetMapping("/{id}/playcount")
-    public ResponseEntity<Map<String, Object>> getTrackPlayCount(@PathVariable int id) {
-        try {
-            Track track = trackService.getTrackById(id);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("trackId", track.getId());
-            response.put("title", track.getTitle());
-            response.put("playCount", track.getPlayCount());
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("error", "Track not found");
-            error.put("message", e.getMessage());
-            return ResponseEntity.notFound().build();
-        }
-    }
-    
-    /**
-     * Record a play/listen event for a track - No authentication required
-     * This endpoint will increment the play count and handle fraud detection
-     * @param id Track ID
-     * @param listenDuration How long the user listened (in seconds)
-     * @param request HTTP request to get IP address
-     * @return Play recording result
-     */
-    @PostMapping("/{id}/play")
-    public ResponseEntity<Map<String, Object>> recordPlay(
-            @PathVariable int id,
-            @RequestParam(defaultValue = "30") Integer listenDuration,
-            HttpServletRequest request) {
-        try {
-            // Get client IP address
-            String ipAddress = getClientIpAddress(request);
-            
-            // Use TrackPlayService if available, otherwise update track directly
-            Track track = trackService.getTrackById(id);
-            
-            // Basic validation
-            if (listenDuration < 1) {
-                Map<String, Object> error = new HashMap<>();
-                error.put("error", "Invalid listen duration");
-                error.put("message", "Listen duration must be at least 1 second");
-                return ResponseEntity.badRequest().body(error);
+    private boolean validateAdminToken(String token) {
+        if (token != null && token.startsWith("Bearer ")) {
+            String jwt = token.substring(7);
+            try {
+                jwtUtil.validateJwtToken(jwt);
+                return jwtUtil.hasAdminRole(jwt);
+            } catch (Exception e) {
+                throw new BadRequestException("Invalid JWT token: " + e.getMessage());
             }
-            
-            // Update play count (simplified version - in production, use TrackPlayService)
-            track.setPlayCount(track.getPlayCount() + 1);
-            track.setLastPlayedAt(java.time.LocalDateTime.now());
-            trackService.updateTrack(track);
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("trackId", track.getId());
-            response.put("newPlayCount", track.getPlayCount());
-            response.put("listenDuration", listenDuration);
-            response.put("message", "Play recorded successfully");
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("error", "Failed to record play");
-            error.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(error);
         }
+        throw new BadRequestException("Invalid token format");
     }
     
     /**
-     * Helper method to get client IP address
-     * @param request HTTP request
-     * @return Client IP address
+     * Helper method to convert TrackRequest to Track entity
      */
-    private String getClientIpAddress(HttpServletRequest request) {
-        String xForwardedForHeader = request.getHeader("X-Forwarded-For");
-        if (xForwardedForHeader == null) {
-            return request.getRemoteAddr();
-        } else {
-            return xForwardedForHeader.split(",")[0];
-        }
+    private Track convertRequestToTrack(TrackRequest trackRequest) {
+        // This is a simplified conversion - in a real application,
+        // you would need to fetch artists, album, etc. based on IDs
+        Track track = new Track();
+        track.setTitle(trackRequest.getTitle());
+        track.setDuration(trackRequest.getDuration());
+        track.setPath(trackRequest.getPath());
+        track.setCover(trackRequest.getCover());
+        // Additional fields would need to be set based on your requirements
+        
+        return track;
     }
 }

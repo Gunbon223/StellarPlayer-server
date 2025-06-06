@@ -13,8 +13,5 @@ public class TrackRequest {
 
     private String path;
     private String cover;
-    private String lyrics;
-    private boolean status;
-    private long playCount;
     private int albumId;
 }

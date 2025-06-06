@@ -15,11 +15,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Log4j2
 @Component
@@ -32,36 +29,19 @@ public class AuthTokenFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         try {
             String jwt = parseJwt(request);
-            log.debug("Processing request to: {}", request.getRequestURI());
-            
             if (jwt != null) {
-                log.debug("JWT token found, validating...");
-                jwtUtil.validateJwtToken(jwt);
+                jwtUtil.validateJwtToken(jwt); // This will throw an exception if the token is invalid or expired
                 String username = jwtUtil.getUserNameFromJwtToken(jwt);
-                List<String> roles = jwtUtil.getRolesFromJwtToken(jwt);
-                log.debug("User: {}, Roles: {}", username, roles);
 
                 UserDetailsImplement userDetails = (UserDetailsImplement) userDetailService.loadUserByUsername(username);
-                List<SimpleGrantedAuthority> authorities = roles.stream()
-                    .map(role -> new SimpleGrantedAuthority(role))
-                    .collect(Collectors.toList());
-                log.debug("User authorities: {}", authorities);
-
-                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                    userDetails, 
-                    null, 
-                    authorities
-                );
+                UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                log.debug("Authentication set in SecurityContext");
-            } else {
-                log.debug("No JWT token found in request");
             }
         } catch (Exception e) {
-            log.error("Cannot set user authentication: {}", e.getMessage(), e);
         }
         filterChain.doFilter(request, response);
+
     }
 
     private String parseJwt(HttpServletRequest request) {

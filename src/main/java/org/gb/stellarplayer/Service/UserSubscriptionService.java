@@ -4,7 +4,6 @@ import org.gb.stellarplayer.Entites.User;
 import org.gb.stellarplayer.Entites.UserSubscription;
 
 import java.util.List;
-import java.util.Map;
 
 public interface UserSubscriptionService {
     /**
@@ -47,16 +46,5 @@ public interface UserSubscriptionService {
      */
     UserSubscription getUserSubscriptionByUserId(int user_id);
 
-    /**
-     * Get the total count of users with active subscriptions
-     * @return The total count
-     */
-    long getTotalActiveSubscriptionsCount();
 
-    /**
-     * Get new subscription counts by period
-     * @param period The period (month, quarter, year)
-     * @return Map of period to count
-     */
-    Map<String, Long> getNewSubscriptionsCountByPeriod(String period);
 }

@@ -1,59 +1,31 @@
 package org.gb.stellarplayer.Service;
 
 import org.gb.stellarplayer.Entites.*;
-import org.gb.stellarplayer.DTO.FavouriteTrackDTO;
-import org.gb.stellarplayer.DTO.FavouriteAlbumDTO;
-import org.gb.stellarplayer.DTO.FavouriteArtistDTO;
-import org.gb.stellarplayer.DTO.FavouritePlaylistDTO;
-import org.springframework.data.domain.Page;
 
 import java.util.List;
-import java.util.Map;
 
 public interface FavouriteService {
-    // Track favorites
-    UserFavouriteTrack addTrackToFavourites(Integer userId, Integer trackId);
-    void removeTrackFromFavourites(Integer userId, Integer trackId);
-    List<UserFavouriteTrack> getUserFavouriteTracks(Integer userId);
-    List<FavouriteTrackDTO> getUserFavouriteTrackEntities(Integer userId);
-    boolean isTrackFavourite(Integer userId, Integer trackId);
+    List<Favourite> getAllUserFavorites(Integer userId);
+    List<Track> getUserFavoriteTracks(Integer userId);
+    List<Playlist> getUserFavoritePlaylists(Integer userId);
+    List<Album> getUserFavoriteAlbums(Integer userId);
+    List<Artist> getUserFavoriteArtists(Integer userId);
     
-    // Paginated track favorites
-    Map<String, Object> getUserFavouriteTracksPaginated(Integer userId, int page, int pageSize, String sortBy, boolean ascending);
+    // Add to favorites
+    boolean addTrackToFavorites(Integer userId, Integer trackId);
+    boolean addPlaylistToFavorites(Integer userId, Integer playlistId);
+    boolean addAlbumToFavorites(Integer userId, Integer albumId);
+    boolean addArtistToFavorites(Integer userId, Integer artistId);
     
-    // Album favorites
-    UserFavouriteAlbum addAlbumToFavourites(Integer userId, Integer albumId);
-    void removeAlbumFromFavourites(Integer userId, Integer albumId);
-    List<UserFavouriteAlbum> getUserFavouriteAlbums(Integer userId);
-    List<FavouriteAlbumDTO> getUserFavouriteAlbumEntities(Integer userId);
-    boolean isAlbumFavourite(Integer userId, Integer albumId);
+    // Remove from favorites
+    boolean removeTrackFromFavorites(Integer userId, Integer trackId);
+    boolean removePlaylistFromFavorites(Integer userId, Integer playlistId);
+    boolean removeAlbumFromFavorites(Integer userId, Integer albumId);
+    boolean removeArtistFromFavorites(Integer userId, Integer artistId);
     
-    // Paginated album favorites
-    Map<String, Object> getUserFavouriteAlbumsPaginated(Integer userId, int page, int pageSize, String sortBy, boolean ascending);
-    
-    // Artist favorites
-    UserFavouriteArtist addArtistToFavourites(Integer userId, Integer artistId);
-    void removeArtistFromFavourites(Integer userId, Integer artistId);
-    List<UserFavouriteArtist> getUserFavouriteArtists(Integer userId);
-    List<FavouriteArtistDTO> getUserFavouriteArtistEntities(Integer userId);
-    boolean isArtistFavourite(Integer userId, Integer artistId);
-    
-    // Paginated artist favorites
-    Map<String, Object> getUserFavouriteArtistsPaginated(Integer userId, int page, int pageSize, String sortBy, boolean ascending);
-    
-    // Playlist favorites
-    UserFavouritePlaylist addPlaylistToFavourites(Integer userId, Integer playlistId);
-    void removePlaylistFromFavourites(Integer userId, Integer playlistId);
-    List<UserFavouritePlaylist> getUserFavouritePlaylists(Integer userId);
-    List<FavouritePlaylistDTO> getUserFavouritePlaylistEntities(Integer userId);
-    boolean isPlaylistFavourite(Integer userId, Integer playlistId);
-    
-    // Paginated playlist favorites
-    Map<String, Object> getUserFavouritePlaylistsPaginated(Integer userId, int page, int pageSize, String sortBy, boolean ascending);
-    
-    // Statistics
-    long getTrackFavouriteCount(Integer trackId);
-    long getAlbumFavouriteCount(Integer albumId);
-    long getArtistFavouriteCount(Integer artistId);
-    long getPlaylistFavouriteCount(Integer playlistId);
+    // Check if item is in favorites
+    boolean isTrackInFavorites(Integer userId, Integer trackId);
+    boolean isPlaylistInFavorites(Integer userId, Integer playlistId);
+    boolean isAlbumInFavorites(Integer userId, Integer albumId);
+    boolean isArtistInFavorites(Integer userId, Integer artistId);
 }

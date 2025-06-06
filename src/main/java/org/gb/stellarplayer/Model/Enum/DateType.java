@@ -4,6 +4,5 @@ public enum DateType {
     DAILY,
     MONTHLY
     ,HALF_YEAR,
-    YEARLY,
-    QUARTERLY
+    YEARLY
 }

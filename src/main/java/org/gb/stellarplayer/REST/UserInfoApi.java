@@ -6,10 +6,8 @@ import org.gb.stellarplayer.Entites.User;
 import org.gb.stellarplayer.Entites.UserSubscription;
 import org.gb.stellarplayer.Response.SubscriptionStatusResponse;
 import org.gb.stellarplayer.Response.UserSubscriptionDTO;
-import org.gb.stellarplayer.Response.UserDTO;
 
 import org.gb.stellarplayer.Exception.BadRequestException;
-import org.gb.stellarplayer.Repository.UserRepository;
 import org.gb.stellarplayer.Repository.UserSubscriptionRepository;
 import org.gb.stellarplayer.Request.UserUpdatePasswordRequest;
 import org.gb.stellarplayer.Request.UserUpdateRequest;
@@ -39,158 +37,90 @@ public class UserInfoApi {
     UserSubscriptionService userSubscriptionService;
     @Autowired
     JwtUtil jwtUtil;
-    @Autowired
-    UserRepository userRepository;
-
-    @GetMapping
-    public ResponseEntity<?> getAllUsers(@RequestHeader("Authorization") String token) {
-        validateAdminToken(token);
-        return ResponseEntity.ok(userService.getAllUsers());
-    }
-
     @GetMapping("/{id}")
-    public UserDTO getUserInfo(@PathVariable int id, @RequestHeader("Authorization") String token) {
-        validateUserAccess(token, id);
-        User user = userService.getUserById(id);
-        return UserDTO.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .avatar(user.getAvatar())
-                .roles(user.getRoles().stream()
-                        .map(role -> UserDTO.RoleDTO.builder()
-                                .name(role.getName().name())
-                                .build())
-                        .collect(Collectors.toList()))
-                .build();
-    }
-
-    @PostMapping
-    public ResponseEntity<?> createUser(@RequestBody User user, @RequestHeader("Authorization") String token) {
-        validateAdminToken(token);
-        try {
-            User savedUser = userService.createUser(user);
-            return ResponseEntity.status(HttpStatus.CREATED).body(savedUser);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Failed to create user: " + e.getMessage()));
-        }
+    public User getUserInfo(@PathVariable int id, @RequestHeader("Authorization") String token) {
+        log.info(token);
+        String jwt = token.substring(7);
+        jwtUtil.validateJwtToken(jwt);
+        return userService.getUserById(id);
     }
 
     @PostMapping("/{id}/update")
-    public ResponseEntity<?> updateUserInfo(@RequestBody UserUpdateRequest user, 
-                                          @RequestHeader("Authorization") String token,
-                                          @PathVariable int id) {
-        validateUserAccess(token, id);
-        userService.updateUser(user, id);
-        return new ResponseEntity<>(user, HttpStatus.OK);
+    public ResponseEntity<?> updateUserInfo(@RequestBody UserUpdateRequest user, @RequestHeader("Authorization") String token,@PathVariable int id) {
+        String jwt = token.substring(7);
+        jwtUtil.validateJwtToken(jwt);
+        userService.updateUser(user,id);
+        return new ResponseEntity<>(user, HttpStatus.OK); //tra ve 200
+
     }
 
     @PostMapping("/{id}/update/avatar")
-    public ResponseEntity<?> updateUserAvatar(@RequestBody UserUpdateRequest user, 
-                                            @RequestHeader("Authorization") String token,
-                                            @PathVariable int id) {
-        validateUserAccess(token, id);
-        userService.updateUserAvatar(user, id);
+    public ResponseEntity<?> updateUserAvatar(@RequestBody UserUpdateRequest user, @RequestHeader("Authorization") String token,@PathVariable int id) {
+        String jwt = token.substring(7);
+        jwtUtil.validateJwtToken(jwt);
+        userService.updateUserAvatar(user,id);
         return new ResponseEntity<>(user, HttpStatus.OK);
     }
 
     @PostMapping("/{id}/update/password")
-    public ResponseEntity<?> updateUserPassword(@RequestBody UserUpdatePasswordRequest user, 
-                                              @RequestHeader("Authorization") String token, 
-                                              @PathVariable int id) {
-        validateUserAccess(token, id);
+    public ResponseEntity<?> updateUserPassword(@RequestBody UserUpdatePasswordRequest user, @RequestHeader("Authorization") String token, @PathVariable int id) {
+        String jwt = token.substring(7);
+        jwtUtil.validateJwtToken(jwt);
         if (user.oldPassword == null || user.newPassword == null) {
             return new ResponseEntity<>("Old password and new password must not be null", HttpStatus.BAD_REQUEST);
         }
-        userService.updateUserPassword(user, id);
+        userService.updateUserPassword(user,id);
         return new ResponseEntity<>(user, HttpStatus.OK);
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<?> updateUser(@PathVariable int id, 
-                                      @RequestBody User user,
-                                      @RequestHeader("Authorization") String token) {
-        validateUserAccess(token, id);
-        try {
-            user.setId(id);
-            User updatedUser = userService.updateUser(user);
-            return ResponseEntity.ok(updatedUser);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Failed to update user: " + e.getMessage()));
-        }
-    }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteUser(@PathVariable int id, 
-                                      @RequestHeader("Authorization") String token) {
-        validateUserAccess(token, id);
-        try {
-            userService.deleteUser(id);
-            return ResponseEntity.ok(Map.of("message", "User deleted successfully"));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("message", "Failed to delete user: " + e.getMessage()));
-        }
-    }
-
+    /**
+     * Get the active subscription for a user
+     * This endpoint returns the most recent active subscription or a message if none exists
+     */
     @GetMapping("/{id}/subscription")
-    public ResponseEntity<SubscriptionStatusResponse> getUserSubscription(@PathVariable int id, 
-                                                                        @RequestHeader("Authorization") String token) {
-        validateUserAccess(token, id);
+    public ResponseEntity<SubscriptionStatusResponse> getUserSubscription(@PathVariable int id, @RequestHeader("Authorization") String token) {
+        String jwt = token.substring(7);
+        jwtUtil.validateJwtToken(jwt);
+
         UserSubscription subscription = userSubscriptionService.getUserSubscriptionByUserId(id);
 
         if (subscription == null) {
+            // User has no active subscription
             return new ResponseEntity<>(SubscriptionStatusResponse.noSubscription(), HttpStatus.OK);
         } else {
+            // User has an active subscription
             return new ResponseEntity<>(SubscriptionStatusResponse.activeSubscription(subscription), HttpStatus.OK);
         }
     }
 
-    private void validateAdminToken(String token) {
-        if (token != null && token.startsWith("Bearer ")) {
-            String jwt = token.substring(7);
-            try {
-                jwtUtil.validateJwtToken(jwt);
-                String username = jwtUtil.getUserNameFromJwtToken(jwt);
-                User user = userRepository.findByName(username)
-                        .orElseThrow(() -> new BadRequestException("User not found"));
-                if (!hasAdminRole(user)) {
-                    throw new BadRequestException("Access denied. Admin privileges required");
-                }
-            } catch (Exception e) {
-                throw new BadRequestException("Invalid JWT token: " + e.getMessage());
-            }
+    /**
+     * Get all subscriptions for a user
+     * This endpoint returns all subscriptions for a user, including inactive ones
+     */
+    @GetMapping("/{id}/subscriptions")
+    public ResponseEntity<?> getUserSubscriptions(@PathVariable int id, @RequestHeader("Authorization") String token) {
+        String jwt = token.substring(7);
+        jwtUtil.validateJwtToken(jwt);
+
+        // Get the user's subscription (users can only have one subscription at a time)
+        UserSubscription subscription = userSubscriptionService.getUserSubscriptionByUserId(id);
+
+        if (subscription == null) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "You don't have any subscription. Please purchase a subscription to access premium features.");
+            response.put("subscription", null);
+            return new ResponseEntity<>(response, HttpStatus.OK);
         } else {
-            throw new BadRequestException("Invalid token format");
+            // Convert to DTO and return as a single object, not a list
+            UserSubscriptionDTO dto = UserSubscriptionDTO.fromEntity(subscription);
+            return new ResponseEntity<>(dto, HttpStatus.OK);
         }
     }
 
-    private void validateUserAccess(String token, int userId) {
-        if (token != null && token.startsWith("Bearer ")) {
-            String jwt = token.substring(7);
-            try {
-                jwtUtil.validateJwtToken(jwt);
-                String username = jwtUtil.getUserNameFromJwtToken(jwt);
-                User user = userRepository.findByName(username)
-                        .orElseThrow(() -> new BadRequestException("User not found"));
-                
-                if (!hasAdminRole(user) && user.getId() != userId) {
-                    throw new BadRequestException("Access denied. You can only access your own profile");
-                }
-            } catch (Exception e) {
-                throw new BadRequestException("Invalid JWT token: " + e.getMessage());
-            }
-        } else {
-            throw new BadRequestException("Invalid token format");
-        }
-    }
+    /**
+     * Get the active subscription for a user
+     * This endpoint returns only the most recent active subscription, or a message if none exists
+     */
 
-    private boolean hasAdminRole(User user) {
-        return user.getRoles().stream()
-                .anyMatch(role -> role.getName().name().equals("ROLE_ADMIN"));
-    }
-
-    
 }
