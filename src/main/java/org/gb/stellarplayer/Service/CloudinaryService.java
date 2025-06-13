@@ -10,6 +10,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class CloudinaryService {
@@ -74,6 +75,32 @@ public class CloudinaryService {
             log.error("Error uploading audio file: {}", e.getMessage());
             throw new IOException("Failed to upload audio: " + e.getMessage());
         }
+    }
+
+    /**
+     * Async audio upload for parallel processing
+     */
+    public CompletableFuture<CloudinaryResponse> uploadAudioAsync(MultipartFile file, String folderName) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return uploadAudio(file, folderName);
+            } catch (IOException e) {
+                throw new RuntimeException("Async audio upload failed: " + e.getMessage(), e);
+            }
+        });
+    }
+    
+    /**
+     * Async image upload for parallel processing
+     */
+    public CompletableFuture<CloudinaryResponse> uploadFileAsync(MultipartFile file, String folderName) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return uploadFile(file, folderName);
+            } catch (IOException e) {
+                throw new RuntimeException("Async file upload failed: " + e.getMessage(), e);
+            }
+        });
     }
 
     private CloudinaryResponse buildResponse(Map<String, Object> uploadResult, String resourceType) {

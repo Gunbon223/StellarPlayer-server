@@ -52,7 +52,7 @@ public class GenreServiceImpl implements GenreService {
         // Create new genre
         Genre genre = new Genre();
         genre.setName(genreRequest.getName());
-        genre.setDescription(genreRequest.getDescription());
+        genre.setCover_path(genreRequest.getCover_path());
         genre.setCreatedAt(LocalDateTime.now());
         genre.setUpdatedAt(LocalDateTime.now());
         
@@ -75,7 +75,7 @@ public class GenreServiceImpl implements GenreService {
         
         // Update genre
         existingGenre.setName(genreRequest.getName());
-        existingGenre.setDescription(genreRequest.getDescription());
+        existingGenre.setCover_path(genreRequest.getCover_path());
         existingGenre.setUpdatedAt(LocalDateTime.now());
         
         return genreRepository.save(existingGenre);
@@ -162,7 +162,7 @@ public class GenreServiceImpl implements GenreService {
         Map<String, Object> statistics = new HashMap<>();
         statistics.put("genre_id", genreId);
         statistics.put("genre_name", genre.getName());
-        statistics.put("genre_description", genre.getDescription());
+        statistics.put("genre_cover_path", genre.getCover_path());
         statistics.put("track_count", trackCount);
         statistics.put("total_duration_seconds", totalDuration);
         statistics.put("total_duration_formatted", formatDuration(totalDuration));

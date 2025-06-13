@@ -25,6 +25,7 @@ public class FavouriteTrackDTO {
     private String lyrics;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Integer releaseYear;
     private List<Artist> artists;
     private Album album;
     private LocalDateTime favouriteAddedAt;
@@ -41,6 +42,7 @@ public class FavouriteTrackDTO {
                 .album(userFavouriteTrack.getTrack().getAlbum())
                 .createdAt(userFavouriteTrack.getTrack().getCreatedAt())
                 .updatedAt(userFavouriteTrack.getTrack().getUpdatedAt())
+                .releaseYear(userFavouriteTrack.getTrack().getReleaseYear())
                 .artists(userFavouriteTrack.getTrack().getArtists())
                 .favouriteAddedAt(userFavouriteTrack.getCreatedAt())
                 .build();

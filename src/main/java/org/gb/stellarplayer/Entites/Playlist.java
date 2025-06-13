@@ -28,6 +28,11 @@ public class Playlist {
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 
+    // User association for personalized playlists (null for system playlists)
+    @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;
+
     @ManyToMany
     @JoinTable(
             name = "playlist_track",

@@ -122,25 +122,83 @@ public class SubscriptionMngApi {
     @GetMapping("/{id}/revenue")
     public ResponseEntity<Map<String, Object>> calculateRevenue(
             @PathVariable int id,
-            @RequestParam(defaultValue = "month") String period,
+            @RequestParam(defaultValue = "year") String period,
             @RequestHeader("Authorization") String token) {
         validateAdminToken(token);
         Map<String, Object> response = revenueStatisticsService.calculateSubscriptionRevenue(id, period);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
-    
+
     /**
-     * Calculate revenue for all subscriptions
-     * @param period The period (month, quarter, year)
+     * Get monthly revenue breakdown for a specific subscription
+     * Shows revenue for each month over the past 12 months by default
+     * @param id Subscription ID
+     * @param months Number of months to show (default: 12)
      * @param token Admin authentication token
-     * @return Revenue statistics for all subscriptions
+     * @return Monthly revenue breakdown
      */
-    @GetMapping("/revenue")
-    public ResponseEntity<Map<String, Object>> calculateTotalRevenue(
-            @RequestParam(defaultValue = "month") String period,
+    @GetMapping("/{id}/revenue/monthly")
+    public ResponseEntity<Map<String, Object>> getMonthlyRevenue(
+            @PathVariable int id,
+            @RequestParam(defaultValue = "12") int months,
             @RequestHeader("Authorization") String token) {
         validateAdminToken(token);
-        Map<String, Object> response = revenueStatisticsService.calculateTotalRevenue(period);
+        
+        Map<String, Object> response = revenueStatisticsService.getMonthlyRevenueBreakdown(id, months);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    /**
+     * Get detailed revenue analytics for a specific subscription
+     * Includes monthly breakdown, trends, and comparisons
+     * @param id Subscription ID
+     * @param token Admin authentication token
+     * @return Detailed revenue analytics
+     */
+    @GetMapping("/{id}/revenue/analytics")
+    public ResponseEntity<Map<String, Object>> getRevenueAnalytics(
+            @PathVariable int id,
+            @RequestHeader("Authorization") String token) {
+        validateAdminToken(token);
+        
+        Map<String, Object> response = revenueStatisticsService.getDetailedRevenueAnalytics(id);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    /**
+     * Get monthly revenue summary for ALL subscriptions
+     * Shows total orders and total revenue for each month in a clean summary format
+     * @param months Number of months to show (default: 12, max: 24)
+     * @param token Admin authentication token
+     * @return Monthly revenue summary with totals
+     */
+    @GetMapping("/revenue/monthly")
+    public ResponseEntity<Map<String, Object>> getAllSubscriptionsMonthlyRevenue(
+            @RequestParam(defaultValue = "12") int months,
+            @RequestHeader("Authorization") String token) {
+        validateAdminToken(token);
+        
+        // Limit months to prevent excessive data
+        if (months > 24) months = 24;
+        if (months < 1) months = 12;
+        
+        Map<String, Object> response = revenueStatisticsService.getMonthlySummaryAllSubscriptions(months);
+        return new ResponseEntity<>(response, HttpStatus.OK);
+    }
+
+    /**
+     * Get detailed monthly revenue breakdown for ALL subscriptions (original method)
+     * @param months Number of months to show (default: 12)
+     * @param token Admin authentication token
+     * @return Detailed monthly revenue breakdown for all subscriptions
+     */
+    @GetMapping("/revenue/monthly/detailed")
+    public ResponseEntity<Map<String, Object>> getAllSubscriptionsMonthlyRevenueDetailed(
+            @RequestParam(defaultValue = "12") int months,
+            @RequestHeader("Authorization") String token) {
+        validateAdminToken(token);
+        
+        Map<String, Object> response = revenueStatisticsService.getAllSubscriptionsMonthlyRevenue(months);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 

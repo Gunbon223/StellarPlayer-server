@@ -2,7 +2,12 @@ package org.gb.stellarplayer.REST;
 
 import lombok.RequiredArgsConstructor;
 import org.gb.stellarplayer.Entites.Track;
+import org.gb.stellarplayer.Entites.User;
+import org.gb.stellarplayer.Exception.BadRequestException;
+import org.gb.stellarplayer.Repository.UserRepository;
 import org.gb.stellarplayer.Service.TrackService;
+import org.gb.stellarplayer.Service.TrackPlayService;
+import org.gb.stellarplayer.Ultils.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +25,15 @@ import jakarta.servlet.http.HttpServletRequest;
 public class TrackApi {
     @Autowired
     TrackService trackService;
+    
+    @Autowired
+    TrackPlayService trackPlayService;
+    
+    @Autowired
+    JwtUtil jwtUtil;
+    
+    @Autowired
+    UserRepository userRepository;
     
     @GetMapping("/{id}")
     public Track getTrackById(@PathVariable int id) {
@@ -46,20 +60,8 @@ public class TrackApi {
             stats.put("title", track.getTitle());
             stats.put("playCount", track.getPlayCount());
             stats.put("lastPlayedAt", track.getLastPlayedAt());
-            stats.put("likes", track.getLikes());
-            stats.put("shares", track.getShares());
-            stats.put("comments", track.getComments());
             stats.put("duration", track.getDuration());
-            
-            // Add engagement metrics
-            Map<String, Object> engagement = new HashMap<>();
-            engagement.put("totalInteractions", track.getLikes() + track.getShares() + track.getComments());
-            engagement.put("likesPerPlay", track.getPlayCount() > 0 ? 
-                (double) track.getLikes() / track.getPlayCount() : 0.0);
-            engagement.put("sharesPerPlay", track.getPlayCount() > 0 ? 
-                (double) track.getShares() / track.getPlayCount() : 0.0);
-            
-            stats.put("engagement", engagement);
+            stats.put("releaseYear", track.getReleaseYear());
             
             return ResponseEntity.ok(stats);
         } catch (Exception e) {
@@ -84,6 +86,7 @@ public class TrackApi {
             response.put("trackId", track.getId());
             response.put("title", track.getTitle());
             response.put("playCount", track.getPlayCount());
+            response.put("releaseYear", track.getReleaseYear());
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -95,10 +98,12 @@ public class TrackApi {
     }
     
     /**
-     * Record a play/listen event for a track - No authentication required
+     * Record a play/listen event for a track - AUTHENTICATION REQUIRED
      * This endpoint will increment the play count and handle fraud detection
+     * Only authenticated users can record plays
      * @param id Track ID
      * @param listenDuration How long the user listened (in seconds)
+     * @param token JWT authorization token
      * @param request HTTP request to get IP address
      * @return Play recording result
      */
@@ -106,13 +111,14 @@ public class TrackApi {
     public ResponseEntity<Map<String, Object>> recordPlay(
             @PathVariable int id,
             @RequestParam(defaultValue = "30") Integer listenDuration,
+            @RequestHeader("Authorization") String token,
             HttpServletRequest request) {
         try {
-            // Get client IP address
-            String ipAddress = getClientIpAddress(request);
+            // Validate authentication and get user
+            User authenticatedUser = validateAndGetUser(token);
             
-            // Use TrackPlayService if available, otherwise update track directly
-            Track track = trackService.getTrackById(id);
+            // Get client IP address for fraud detection
+            String ipAddress = getClientIpAddress(request);
             
             // Basic validation
             if (listenDuration < 1) {
@@ -122,24 +128,55 @@ public class TrackApi {
                 return ResponseEntity.badRequest().body(error);
             }
             
-            // Update play count (simplified version - in production, use TrackPlayService)
-            track.setPlayCount(track.getPlayCount() + 1);
-            track.setLastPlayedAt(java.time.LocalDateTime.now());
-            trackService.updateTrack(track);
+            // Use TrackPlayService for proper fraud detection and analytics
+            // Modified to include user information
+            trackPlayService.recordPlay(id, ipAddress, listenDuration, authenticatedUser.getId());
+            
+            // Get updated track to return current play count
+            Track track = trackService.getTrackById(id);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("trackId", track.getId());
             response.put("newPlayCount", track.getPlayCount());
             response.put("listenDuration", listenDuration);
+            response.put("userId", authenticatedUser.getId());
+            response.put("username", authenticatedUser.getName());
             response.put("message", "Play recorded successfully");
             
             return ResponseEntity.ok(response);
+        } catch (BadRequestException e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Authentication failed");
+            error.put("message", e.getMessage());
+            return ResponseEntity.status(401).body(error);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to record play");
             error.put("message", e.getMessage());
             return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    /**
+     * Validate JWT token and get authenticated user
+     * @param token JWT token with "Bearer " prefix
+     * @return Authenticated User entity
+     * @throws BadRequestException if token is invalid or user not found
+     */
+    private User validateAndGetUser(String token) {
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new BadRequestException("Invalid token format. Expected 'Bearer <token>'");
+        }
+        
+        String jwt = token.substring(7);
+        try {
+            jwtUtil.validateJwtToken(jwt);
+            String username = jwtUtil.getUserNameFromJwtToken(jwt);
+            return userRepository.findByName(username)
+                    .orElseThrow(() -> new BadRequestException("User not found"));
+        } catch (Exception e) {
+            throw new BadRequestException("Invalid JWT token: " + e.getMessage());
         }
     }
     

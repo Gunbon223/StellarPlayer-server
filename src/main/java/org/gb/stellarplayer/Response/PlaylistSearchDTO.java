@@ -12,7 +12,6 @@ import lombok.NoArgsConstructor;
 public class PlaylistSearchDTO {
     private Integer id;
     private String name;
-    private String description;
     private String cover;
     private String creatorName;
     private int trackCount;

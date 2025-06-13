@@ -100,7 +100,6 @@ public class SearchService {
             .map(genre -> GenreSearchDTO.builder()
                 .id(genre.getId())
                 .name(genre.getName())
-                .description(genre.getDescription())
                 .build())
             .collect(Collectors.toList());
     }

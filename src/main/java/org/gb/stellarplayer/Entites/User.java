@@ -27,6 +27,10 @@ public class User {
     String password;
     String avatar;
     LocalDate dob;
+    
+    @Column(name = "enabled", columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean enabled = false;
 
     @ManyToMany(fetch = FetchType.EAGER)
             @JoinTable(name = "user_role",

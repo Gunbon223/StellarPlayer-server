@@ -74,4 +74,10 @@ public interface UserTrackInteractionRepository extends JpaRepository<UserTrackI
            "GROUP BY uti.track.id " +
            "ORDER BY playCount DESC")
     List<Object[]> findTrendingTracks(@Param("since") LocalDateTime since, Pageable pageable);
+    
+    // For recommendation system
+    @Query("SELECT uti FROM UserTrackInteraction uti " +
+           "WHERE uti.user.id = :userId " +
+           "ORDER BY uti.interactionScore DESC")
+    List<UserTrackInteraction> findTopByUserIdOrderByInteractionScoreDesc(@Param("userId") Integer userId, Pageable pageable);
 } 

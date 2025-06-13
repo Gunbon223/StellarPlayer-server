@@ -1,13 +1,10 @@
-package org.gb.stellarplayer.Service.Impl;
+package org.gb.stellarplayer.Service.Implement;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.math3.linear.ArrayRealVector;
-import org.apache.commons.math3.linear.RealVector;
 import org.gb.stellarplayer.DTO.RecommendationRequest;
 import org.gb.stellarplayer.DTO.RecommendationResponse;
 import org.gb.stellarplayer.Entites.Track;
-import org.gb.stellarplayer.Entites.User;
 import org.gb.stellarplayer.Entites.UserTrackInteraction;
 import org.gb.stellarplayer.Repository.TrackRepository;
 import org.gb.stellarplayer.Repository.UserRepository;

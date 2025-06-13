@@ -24,6 +24,7 @@ public class TrackDTO {
     private String lyrics;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Integer releaseYear;
     private List<Artist> artists;
 
     public static TrackDTO fromEntity(Track track) {
@@ -37,6 +38,7 @@ public class TrackDTO {
                 .lyrics(track.getLyrics())
                 .createdAt(track.getCreatedAt())
                 .updatedAt(track.getUpdatedAt())
+                .releaseYear(track.getReleaseYear())
                 .artists(track.getArtists())
                 .build();
     }

@@ -25,6 +25,7 @@ public class TrackAdminDTO {
     private String lyrics;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private Integer releaseYear;
     private List<Artist> artists;
     private Long playCount;
     private List<String> genres;
@@ -40,6 +41,7 @@ public class TrackAdminDTO {
                 .lyrics(track.getLyrics())
                 .createdAt(track.getCreatedAt())
                 .updatedAt(track.getUpdatedAt())
+                .releaseYear(track.getReleaseYear())
                 .artists(track.getArtists())
                 .playCount(track.getPlayCount())
                 .genres(track.getGenres().stream().map(Genre::getName).toList())

@@ -20,20 +20,56 @@ public class History {
 
     private Integer orderNumber;
 
-    int playedAt;
+    @Column(name = "played_at")
+    private LocalDateTime playedAt;
 
-    LocalDateTime updatedAt;
-
-    @OneToOne
-    User user;
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @ManyToOne
-    Playlist playlist;
+    @JoinColumn(name = "user_id")
+    private User user;
+
     @ManyToOne
-    Album album;
+    @JoinColumn(name = "playlist_id")
+    private Playlist playlist;
+    
     @ManyToOne
-    Track track;
+    @JoinColumn(name = "album_id")
+    private Album album;
+    
+    @ManyToOne
+    @JoinColumn(name = "track_id")
+    private Track track;
 
+    @ManyToOne
+    @JoinColumn(name = "artist_id")
+    private Artist artist;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "history_type")
+    private HistoryType historyType;
 
+    @PrePersist
+    protected void onCreate() {
+        if (playedAt == null) {
+            playedAt = LocalDateTime.now();
+        }
+        if (updatedAt == null) {
+            updatedAt = LocalDateTime.now();
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
+    public enum HistoryType {
+        TRACK_PLAY,
+        ALBUM_PLAY,
+        PLAYLIST_PLAY,
+        ARTIST_PLAY,
+        GENRE_PLAY
+    }
 }

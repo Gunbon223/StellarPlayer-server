@@ -37,10 +37,4 @@ public class TrackPlayLog {
 
     @Column(name = "last_daily_reset")
     private LocalDateTime lastDailyReset;
-
-    @Column(name = "is_blocked")
-    private Boolean isBlocked = false;
-
-    @Column(name = "block_reason")
-    private String blockReason;
 } 

@@ -17,4 +17,10 @@ public interface PlaylistService {
     List<Track> getTracksByPlaylistId(int playlistId);
     Playlist addTrackToPlaylist(int playlistId, int trackId);
     Playlist removeTrackFromPlaylist(int playlistId, int trackId);
+
+    /**
+     * Delete playlist with cascade handling for related records
+     * @param playlistId Playlist ID to delete
+     */
+    void deletePlaylistWithCascade(int playlistId);
 }

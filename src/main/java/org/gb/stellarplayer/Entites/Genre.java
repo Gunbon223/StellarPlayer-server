@@ -19,7 +19,7 @@ public class Genre {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
     String name;
-    String description;
+    String cover_path;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
 }

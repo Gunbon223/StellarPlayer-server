@@ -44,9 +44,6 @@ public class TrackStatsDTO {
                 .title(track.getTitle())
                 .playCount(track.getPlayCount())
                 .lastPlayedAt(track.getLastPlayedAt())
-                .dailyPlayCount(track.getDailyPlayCount())
-                .lastDailyReset(track.getLastDailyReset())
-                .isSuspicious(track.getIsSuspicious())
                 .build();
     }
 } 

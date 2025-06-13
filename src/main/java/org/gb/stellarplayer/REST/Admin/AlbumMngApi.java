@@ -103,6 +103,7 @@ public class AlbumMngApi {
 
     /**
      * Delete album
+     * This will also clean up all related records (history, favorites, tracks, etc.)
      * @param id Album ID
      * @param token Authentication token
      * @return Success message
@@ -113,8 +114,17 @@ public class AlbumMngApi {
             @RequestHeader("Authorization") String token) {
         validatePermission(token);
         try {
-            albumService.deleteAlbum(id);
-            return ResponseEntity.ok(Map.of("message", "Album deleted successfully"));
+            // First verify album exists
+            Album album = albumService.getAlbumById(id);
+            
+            // Delete album with proper cascade handling
+            albumService.deleteAlbumWithCascade(id);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Album deleted successfully",
+                "album_title", album.getTitle(),
+                "album_id", id
+            ));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Failed to delete album: " + e.getMessage()));
@@ -358,6 +368,7 @@ public class AlbumMngApi {
         trackRequest.setLyrics(track.getLyrics());
         trackRequest.setStatus(track.isStatus());
         trackRequest.setPlayCount(track.getPlayCount() != null ? track.getPlayCount() : 0L);
+        trackRequest.setReleaseYear(track.getReleaseYear());
         
         // Set album ID if album exists
         if (track.getAlbum() != null) {

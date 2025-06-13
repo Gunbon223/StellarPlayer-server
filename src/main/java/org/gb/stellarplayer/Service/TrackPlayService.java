@@ -9,8 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
 
 @Service
 public class TrackPlayService {
@@ -21,16 +19,21 @@ public class TrackPlayService {
     @Autowired
     private TrackPlayLogRepository trackPlayLogRepository;
 
-    private static final int MAX_PLAYS_PER_DAY = 100;
-    private static final int MIN_PLAY_INTERVAL_SECONDS = 30;
-    private static final int SUSPICIOUS_PLAYS_THRESHOLD = 50;
-
+    /**
+     * Record a play for a track by an authenticated user
+     * @param trackId ID of the track being played
+     * @param ipAddress IP address of the client
+     * @param listenDuration Duration of the listen in seconds
+     * @param userId ID of the authenticated user
+     */
     @Transactional
-    public void recordPlay(Integer trackId, String ipAddress, Integer listenDuration) {
+    public void recordPlay(Integer trackId, String ipAddress, Integer listenDuration, Integer userId) {
         Track track = trackRepository.findById(trackId)
             .orElseThrow(() -> new RuntimeException("Track not found"));
 
         LocalDateTime now = LocalDateTime.now();
+        
+        // Find or create play log for this user/track/IP combination
         TrackPlayLog playLog = trackPlayLogRepository.findByTrackIdAndIpAddress(trackId, ipAddress)
             .orElseGet(() -> TrackPlayLog.builder()
                 .track(track)
@@ -40,11 +43,6 @@ public class TrackPlayService {
                 .lastDailyReset(now)
                 .build());
 
-        // Check if IP is blocked
-        if (playLog.getIsBlocked()) {
-            throw new RuntimeException("This IP has been blocked: " + playLog.getBlockReason());
-        }
-
         // Reset daily count if it's a new day
         if (playLog.getLastDailyReset() == null || 
             !playLog.getLastDailyReset().toLocalDate().equals(now.toLocalDate())) {
@@ -52,46 +50,12 @@ public class TrackPlayService {
             playLog.setLastDailyReset(now);
         }
 
-        // Check for minimum listen duration
-        if (listenDuration < MIN_PLAY_INTERVAL_SECONDS) {
-            playLog.setIsBlocked(true);
-            playLog.setBlockReason("Play duration too short: " + listenDuration + " seconds");
-            trackPlayLogRepository.save(playLog);
-            return;
+        // Basic validation - minimum listen duration
+        if (listenDuration < 1) {
+            throw new RuntimeException("Invalid listen duration. Must be at least 1 second.");
         }
 
-        // Check daily play limit
-        if (playLog.getDailyPlayCount() >= MAX_PLAYS_PER_DAY) {
-            playLog.setIsBlocked(true);
-            playLog.setBlockReason("Exceeded daily play limit");
-            trackPlayLogRepository.save(playLog);
-            return;
-        }
-
-        // Check for rapid plays
-        if (playLog.getLastPlayedAt() != null && 
-            ChronoUnit.SECONDS.between(playLog.getLastPlayedAt(), now) < MIN_PLAY_INTERVAL_SECONDS) {
-            playLog.setIsBlocked(true);
-            playLog.setBlockReason("Rapid play detected");
-            trackPlayLogRepository.save(playLog);
-            return;
-        }
-
-        // Check for suspicious activity
-        List<TrackPlayLog> recentPlays = trackPlayLogRepository.findRecentPlaysByTrackAndIp(
-            trackId, 
-            ipAddress, 
-            now.minus(1, ChronoUnit.HOURS)
-        );
-        
-        if (recentPlays.size() > SUSPICIOUS_PLAYS_THRESHOLD) {
-            playLog.setIsBlocked(true);
-            playLog.setBlockReason("Suspicious activity detected: too many plays in short time");
-            trackPlayLogRepository.save(playLog);
-            return;
-        }
-
-        // If all checks pass, update the counts
+        // Update the play counts
         playLog.setPlayCount(playLog.getPlayCount() + 1);
         playLog.setDailyPlayCount(playLog.getDailyPlayCount() + 1);
         playLog.setLastPlayedAt(now);
@@ -101,5 +65,14 @@ public class TrackPlayService {
         track.setPlayCount(track.getPlayCount() + 1);
         track.setLastPlayedAt(now);
         trackRepository.save(track);
+    }
+
+    /**
+     * Legacy method for backward compatibility - throws exception
+     * @deprecated Use recordPlay(Integer, String, Integer, Integer) instead
+     */
+    @Deprecated
+    public void recordPlay(Integer trackId, String ipAddress, Integer listenDuration) {
+        throw new RuntimeException("Authentication required. Users must be logged in to record plays.");
     }
 } 

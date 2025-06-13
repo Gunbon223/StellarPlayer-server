@@ -12,5 +12,5 @@ import lombok.NoArgsConstructor;
 public class GenreSearchDTO {
     private Integer id;
     private String name;
-    private String description;
+    private String cover_path;
 }

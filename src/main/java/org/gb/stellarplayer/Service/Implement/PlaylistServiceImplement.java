@@ -5,9 +5,12 @@ import org.gb.stellarplayer.Entites.Track;
 import org.gb.stellarplayer.Exception.BadRequestException;
 import org.gb.stellarplayer.Repository.PlaylistRepository;
 import org.gb.stellarplayer.Repository.TrackRepository;
+import org.gb.stellarplayer.Repository.HistoryRepository;
+import org.gb.stellarplayer.Repository.UserFavouritePlaylistRepository;
 import org.gb.stellarplayer.Service.PlaylistService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 
 import java.time.LocalDateTime;
@@ -21,6 +24,12 @@ public class PlaylistServiceImplement  implements PlaylistService {
     
     @Autowired
     TrackRepository trackRepository;
+
+    @Autowired
+    HistoryRepository historyRepository;
+
+    @Autowired
+    UserFavouritePlaylistRepository userFavouritePlaylistRepository;
 
     @Override
     public List<Playlist> getPlaylists() {
@@ -110,5 +119,37 @@ public class PlaylistServiceImplement  implements PlaylistService {
         playlist.setUpdatedAt(LocalDateTime.now());
         
         return playlistRepository.save(playlist);
+    }
+
+    @Override
+    @Transactional
+    public void deletePlaylistWithCascade(int playlistId) {
+        try {
+            // Verify playlist exists
+            Playlist playlist = getPlaylistById(playlistId);
+            
+            System.out.println("Starting cascade delete for playlist: " + playlist.getName() + " (ID: " + playlistId + ")");
+
+            // 1. Delete from history table first
+            int deletedHistory = historyRepository.deleteByPlaylistId(playlistId);
+            System.out.println("Deleted " + deletedHistory + " history entries for playlist");
+
+            // 2. Delete from user favorites
+            int deletedFavorites = userFavouritePlaylistRepository.deleteByPlaylistId(playlistId);
+            System.out.println("Deleted " + deletedFavorites + " favorite entries for playlist");
+
+            // 3. Remove playlist from any track associations (if your model has playlist_tracks table)
+            // You might need to clear the tracks collection or handle many-to-many relationships
+            
+            // 4. Finally delete the playlist itself
+            playlistRepository.deleteById(playlistId);
+            
+            System.out.println("Successfully deleted playlist: " + playlist.getName() + " (ID: " + playlistId + ")");
+            
+        } catch (Exception e) {
+            System.err.println("Error during cascade delete: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to delete playlist with cascade: " + e.getMessage(), e);
+        }
     }
 }

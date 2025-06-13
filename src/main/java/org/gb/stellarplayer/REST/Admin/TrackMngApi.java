@@ -360,6 +360,7 @@ public class TrackMngApi {
         track.setLyrics(trackRequest.getLyrics());
         track.setStatus(trackRequest.isStatus());
         track.setPlayCount(trackRequest.getPlayCount());
+        track.setReleaseYear(trackRequest.getReleaseYear());
         
         // Additional fields would need to be set based on your requirements
         

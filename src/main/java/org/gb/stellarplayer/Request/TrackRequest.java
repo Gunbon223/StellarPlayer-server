@@ -10,6 +10,7 @@ public class TrackRequest {
     private List<Integer> artist_id;
     private String genre;
     private int duration;
+    private Integer releaseYear;
 
     private String path;
     private String cover;

@@ -15,4 +15,5 @@ public interface AlbumService {
     Album createAlbum(Album album);
     List<Album> getAlbumsByArtistId(int artistId);
     List<Album> getAlbumsByReleaseDateRange(LocalDate startDate, LocalDate endDate);
+    void deleteAlbumWithCascade(int albumId);
 }

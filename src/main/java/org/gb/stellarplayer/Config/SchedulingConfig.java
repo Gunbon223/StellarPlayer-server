@@ -3,6 +3,7 @@ package org.gb.stellarplayer.Config;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.gb.stellarplayer.Service.OrderService;
+import org.gb.stellarplayer.Repository.UserRepository;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -23,6 +24,7 @@ public class SchedulingConfig {
 
     private final OrderService orderService;
     private final RestTemplate restTemplate;
+    private final UserRepository userRepository;
 
     /**
      * Scheduled task to update pending orders
@@ -44,38 +46,34 @@ public class SchedulingConfig {
     }
 
     /**
-     * Alternative implementation that directly updates orders without calling the API
-     * This can be used if you prefer not to make HTTP requests within the application
-     * Uncomment this method and comment out the updatePendingOrders method if you prefer this approach
+     * Scheduled task to clean up unverified users older than 24 hours
+     * Runs every hour
      */
-    /*
-    @Scheduled(fixedRate = 900000) // 15 minutes in milliseconds
-    public void updatePendingOrdersDirectly() {
-        log.info("Running scheduled task to directly update pending orders at {}", LocalDateTime.now());
+    @Scheduled(fixedRate = 3600000) // 1 hour in milliseconds
+    public void cleanupUnverifiedUsers() {
+        log.info("Running scheduled task to cleanup unverified users at {}", LocalDateTime.now());
 
         try {
-            // Get all orders
-            List<org.gb.stellarplayer.Entites.Order> allOrders = orderService.getAllOrders();
-            int updatedCount = 0;
-
-            // Filter for pending orders that are older than 15 minutes
-            LocalDateTime fifteenMinutesAgo = LocalDateTime.now().minus(15, ChronoUnit.MINUTES);
-
-            for (org.gb.stellarplayer.Entites.Order order : allOrders) {
-                // Check if the order is pending and created more than 15 minutes ago
-                if ("PENDING".equals(order.getStatus()) &&
-                    order.getCreatedAt().isBefore(fifteenMinutesAgo)) {
-
-                    // Update the order status to CANCELLED
-                    orderService.updateOrderStatus(order.getOrderCode(), "CANCELLED", null);
-                    updatedCount++;
-                }
+            // Calculate the cutoff time (24 hours ago)
+            LocalDateTime cutoffTime = LocalDateTime.now().minus(24, ChronoUnit.HOURS);
+            
+            // Find all unverified users created before the cutoff time
+            List<Integer> unverifiedUserIds = userRepository.findUnverifiedUsersOlderThan(cutoffTime);
+            
+            if (!unverifiedUserIds.isEmpty()) {
+                log.info("Found {} unverified users to delete", unverifiedUserIds.size());
+                
+                // Delete unverified users
+                int deletedCount = userRepository.deleteUnverifiedUsersOlderThan(cutoffTime);
+                
+                log.info("Successfully deleted {} unverified users older than 24 hours", deletedCount);
+            } else {
+                log.info("No unverified users found to delete");
             }
-
-            log.info("Successfully updated {} pending orders to cancelled", updatedCount);
+            
         } catch (Exception e) {
-            log.error("Error directly updating pending orders: {}", e.getMessage(), e);
+            log.error("Error cleaning up unverified users: {}", e.getMessage(), e);
         }
     }
-    */
+
 }

@@ -1,4 +1,4 @@
-package org.gb.stellarplayer.Service.Impl;
+package org.gb.stellarplayer.Service.Implement;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -99,6 +99,7 @@ public class PlaylistMngApi {
 
     /**
      * Delete playlist (admin only)
+     * This will also clean up all related records (history, favorites, etc.)
      * @param id Playlist ID
      * @param token Admin authentication token
      * @return Success message
@@ -109,8 +110,17 @@ public class PlaylistMngApi {
             @RequestHeader("Authorization") String token) {
         validateAdminToken(token);
         try {
-            playlistService.deletePlaylist(id);
-            return ResponseEntity.ok(Map.of("message", "Playlist deleted successfully"));
+            // First verify playlist exists
+            Playlist playlist = playlistService.getPlaylistById(id);
+            
+            // Delete playlist with proper cascade handling
+            playlistService.deletePlaylistWithCascade(id);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Playlist deleted successfully", 
+                "playlist_name", playlist.getName(),
+                "playlist_id", id
+            ));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Failed to delete playlist: " + e.getMessage()));
@@ -177,6 +187,94 @@ public class PlaylistMngApi {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", "Failed to remove track from playlist: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Get track count for a playlist
+     * @param playlistId Playlist ID
+     * @param token Admin authentication token
+     * @return Track count information
+     */
+    @GetMapping("/{playlistId}/track-count")
+    public ResponseEntity<?> getPlaylistTrackCount(
+            @PathVariable int playlistId,
+            @RequestHeader("Authorization") String token) {
+        validateAdminToken(token);
+        try {
+            Playlist playlist = playlistService.getPlaylistById(playlistId);
+            List<Track> tracks = playlistService.getTracksByPlaylistId(playlistId);
+            
+            return ResponseEntity.ok(Map.of(
+                    "playlist_id", playlistId,
+                    "playlist_name", playlist.getName(),
+                    "track_count", tracks.size()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Failed to get playlist track count: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Get playlist statistics
+     * @param playlistId Playlist ID
+     * @param token Admin authentication token
+     * @return Playlist statistics
+     */
+    @GetMapping("/{playlistId}/statistics")
+    public ResponseEntity<?> getPlaylistStatistics(
+            @PathVariable int playlistId,
+            @RequestHeader("Authorization") String token) {
+        validateAdminToken(token);
+        try {
+            Playlist playlist = playlistService.getPlaylistById(playlistId);
+            List<Track> tracks = playlistService.getTracksByPlaylistId(playlistId);
+            
+            // Calculate total duration
+            int totalDuration = tracks.stream()
+                    .mapToInt(Track::getDuration)
+                    .sum();
+            
+            // Count unique artists
+            long uniqueArtistsCount = tracks.stream()
+                    .flatMap(track -> track.getArtists().stream())
+                    .distinct()
+                    .count();
+            
+            Map<String, Object> statistics = Map.of(
+                    "playlist_id", playlistId,
+                    "playlist_name", playlist.getName(),
+                    "playlist_type", playlist.getType().name(),
+                    "track_count", tracks.size(),
+                    "total_duration_seconds", totalDuration,
+                    "total_duration_formatted", formatDuration(totalDuration),
+                    "unique_artists_count", uniqueArtistsCount,
+                    "created_at", playlist.getCreatedAt(),
+                    "updated_at", playlist.getUpdatedAt()
+            );
+            
+            return ResponseEntity.ok(statistics);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Failed to get playlist statistics: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Format duration in seconds to a human-readable format (HH:MM:SS)
+     * @param durationInSeconds Duration in seconds
+     * @return Formatted duration string
+     */
+    private String formatDuration(int durationInSeconds) {
+        int hours = durationInSeconds / 3600;
+        int minutes = (durationInSeconds % 3600) / 60;
+        int seconds = durationInSeconds % 60;
+        
+        if (hours > 0) {
+            return String.format("%d:%02d:%02d", hours, minutes, seconds);
+        } else {
+            return String.format("%d:%02d", minutes, seconds);
         }
     }
 

@@ -16,5 +16,6 @@ public class TrackSearchDTO {
     private int duration;
     private String cover;
     private String albumTitle;
+    private Integer releaseYear;
     private List<String> artistNames;
 }

@@ -5,7 +5,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.gb.stellarplayer.Model.Enum.DateType;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,39 +31,16 @@ public class Track {
     private LocalDateTime createdAt = LocalDateTime.now();
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
+    private LocalDateTime releaseDate;
+    
+    @Column(name = "release_year")
+    private Integer releaseYear;
 
     @Column(name = "play_count", columnDefinition = "bigint default 0")
     private Long playCount = 0L;
 
     @Column(name = "last_played_at")
     private LocalDateTime lastPlayedAt;
-
-    @Column(name = "min_listen_duration")
-    private Integer minListenDuration = 30; // Minimum seconds to count as a play
-
-    @Column(name = "fraud_threshold")
-    private Integer fraudThreshold = 100; // Maximum plays allowed per day
-
-    @Column(name = "daily_play_count")
-    private Integer dailyPlayCount = 0;
-
-    @Column(name = "last_daily_reset")
-    private LocalDateTime lastDailyReset;
-
-    @Column(name = "is_suspicious")
-    private Boolean isSuspicious = false;
-
-    @Column(name = "suspicious_reason")
-    private String suspiciousReason;
-
-    @Column(name = "likes", columnDefinition = "bigint default 0")
-    private Long likes = 0L;
-
-    @Column(name = "shares", columnDefinition = "bigint default 0")
-    private Long shares = 0L;
-
-    @Column(name = "comments", columnDefinition = "bigint default 0")
-    private Long comments = 0L;
 
     @ManyToOne
     @JoinColumn(name = "album_id")
@@ -87,7 +63,4 @@ public class Track {
             inverseJoinColumns = @JoinColumn(name = "genre_id")
     )
     List<Genre> genres;
-
-
-
 }
