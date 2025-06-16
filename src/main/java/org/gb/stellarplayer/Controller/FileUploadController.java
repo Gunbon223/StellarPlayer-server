@@ -1,11 +1,16 @@
 package org.gb.stellarplayer.Controller;
 
 import org.gb.stellarplayer.Entites.Track;
+import org.gb.stellarplayer.Entites.User;
+import org.gb.stellarplayer.Exception.BadRequestException;
 import org.gb.stellarplayer.Exception.DuplicateSongException;
+import org.gb.stellarplayer.Repository.UserRepository;
 import org.gb.stellarplayer.Request.UploadSongRequest;
 import org.gb.stellarplayer.Response.SongUploadResponse;
 import org.gb.stellarplayer.Service.CloudinaryService;
 import org.gb.stellarplayer.Service.SongUploadService;
+import org.gb.stellarplayer.Service.UserArtistService;
+import org.gb.stellarplayer.Ultils.JwtUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -25,10 +30,17 @@ public class FileUploadController {
     private static final Logger log = LoggerFactory.getLogger(FileUploadController.class);
     private final CloudinaryService cloudinaryService;
     private final SongUploadService songUploadService;
+    private final UserArtistService userArtistService;
+    private final UserRepository userRepository;
+    private final JwtUtil jwtUtil;
 
-    public FileUploadController(CloudinaryService cloudinaryService, SongUploadService songUploadService) {
+    public FileUploadController(CloudinaryService cloudinaryService, SongUploadService songUploadService,
+                               UserArtistService userArtistService, UserRepository userRepository, JwtUtil jwtUtil) {
         this.cloudinaryService = cloudinaryService;
         this.songUploadService = songUploadService;
+        this.userArtistService = userArtistService;
+        this.userRepository = userRepository;
+        this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/upload/image")
@@ -177,6 +189,90 @@ public class FileUploadController {
     }
 
     /**
+     * Artist-specific song upload with permission validation and approval workflow
+     */
+    @PostMapping("/upload/artist-song")
+    public ResponseEntity<?> uploadArtistSong(@RequestParam("audioFile") MultipartFile audioFile,
+                                             @RequestParam(value = "coverFile", required = false) MultipartFile coverFile,
+                                             @RequestParam("title") String title,
+                                             @RequestParam("releaseYear") Integer releaseYear,
+                                             @RequestParam("artistNames") String artistNames,
+                                             @RequestParam(value = "albumTitle", required = false) String albumTitle,
+                                             @RequestParam(value = "genreNames", required = false) String genreNames,
+                                             @RequestHeader("Authorization") String token) {
+        try {
+            log.info("Received artist song upload request - File: {}, Title: {}", audioFile.getOriginalFilename(), title);
+            
+            // Validate user permissions first
+            User user = validateArtistToken(token);
+            
+            // Fast validation checks first
+            if (audioFile.isEmpty()) {
+                return ResponseEntity.badRequest().body(createErrorResponse("Audio file is required"));
+            }
+            
+            if (title == null || title.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(createErrorResponse("Title is required"));
+            }
+            
+            if (artistNames == null || artistNames.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(createErrorResponse("Artist names are required"));
+            }
+            
+            // Optimized string parsing with pre-allocation
+            List<String> artistNamesList = parseNames(artistNames);
+            if (artistNamesList.isEmpty()) {
+                return ResponseEntity.badRequest().body(createErrorResponse("At least one valid artist name is required"));
+            }
+            
+            // Check if user can manage all specified artists
+            if (!canUserManageArtists(user.getId(), artistNamesList)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(createErrorResponse("You don't have permission to upload songs for the specified artists"));
+            }
+            
+            List<String> genreNamesList = genreNames != null && !genreNames.trim().isEmpty() 
+                ? parseNames(genreNames) : null;
+            
+            // Create request object
+            UploadSongRequest request = new UploadSongRequest();
+            request.setTitle(title.trim());
+            request.setReleaseYear(releaseYear);
+            request.setArtistNames(artistNamesList);
+            request.setAlbumTitle(albumTitle != null ? albumTitle.trim() : null);
+            request.setGenreNames(genreNamesList);
+            
+            // Upload song using optimized service - will be created as disabled for approval
+            Track savedTrack = songUploadService.uploadSongOptimizedWithStatus(audioFile, coverFile, request, false);
+            
+            log.info("Artist song uploaded successfully with ID: {} (awaiting approval)", savedTrack.getId());
+            
+            // Create response efficiently
+            SongUploadResponse response = songUploadService.createSongUploadResponseOptimized(savedTrack);
+            response.setMessage("Song uploaded successfully and is awaiting admin approval");
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (IOException e) {
+            log.error("Error uploading artist song: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Failed to upload song: " + e.getMessage()));
+        } catch (DuplicateSongException e) {
+            log.warn("Duplicate artist song upload attempt: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(createDuplicateErrorResponse(e));
+        } catch (RuntimeException e) {
+            log.error("Runtime error uploading artist song: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Failed to upload song: " + e.getMessage()));
+        } catch (Exception e) {
+            log.error("Unexpected error uploading artist song: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Unexpected error occurred"));
+        }
+    }
+
+    /**
      * Optimized string parsing for artist/genre names
      * Pre-allocates ArrayList and uses more efficient splitting
      */
@@ -214,5 +310,54 @@ public class FileUploadController {
         errorResponse.put("songTitle", e.getSongTitle());
         errorResponse.put("artistNames", e.getArtistNames());
         return errorResponse;
+    }
+
+    /**
+     * Validate token and return user with artist role
+     */
+    private User validateArtistToken(String token) {
+        if (token != null && token.startsWith("Bearer ")) {
+            String jwt = token.substring(7);
+            try {
+                jwtUtil.validateJwtToken(jwt);
+                String username = jwtUtil.getUserNameFromJwtToken(jwt);
+                User user = userRepository.findByName(username)
+                        .orElseThrow(() -> new BadRequestException("User not found"));
+                
+                if (!hasArtistRole(user)) {
+                    throw new BadRequestException("Access denied. Artist privileges required");
+                }
+                return user;
+            } catch (Exception e) {
+                throw new BadRequestException("Invalid JWT token: " + e.getMessage());
+            }
+        } else {
+            throw new BadRequestException("Invalid token format");
+        }
+    }
+
+    /**
+     * Check if user has artist role
+     */
+    private boolean hasArtistRole(User user) {
+        return user.getRoles().stream()
+                .anyMatch(role -> role.getName().name().equals("ARTIST"));
+    }
+
+    /**
+     * Check if user can manage all specified artists by name
+     */
+    private boolean canUserManageArtists(Integer userId, List<String> artistNames) {
+        // For now, we'll allow if user has at least one linked artist
+        // This can be enhanced to check specific artist names
+        List<org.gb.stellarplayer.Entites.Artist> userArtists = userArtistService.getUserArtists(userId);
+        
+        if (userArtists.isEmpty()) {
+            return false;
+        }
+        
+        // Check if any of the specified artist names match user's linked artists
+        return userArtists.stream()
+                .anyMatch(artist -> artistNames.contains(artist.getName()));
     }
 }

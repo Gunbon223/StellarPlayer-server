@@ -59,7 +59,6 @@ public class TrackApi {
             stats.put("trackId", track.getId());
             stats.put("title", track.getTitle());
             stats.put("playCount", track.getPlayCount());
-            stats.put("lastPlayedAt", track.getLastPlayedAt());
             stats.put("duration", track.getDuration());
             stats.put("releaseYear", track.getReleaseYear());
             

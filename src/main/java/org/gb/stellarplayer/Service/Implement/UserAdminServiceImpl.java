@@ -1,12 +1,19 @@
 package org.gb.stellarplayer.Service.Implement;
 
 import lombok.RequiredArgsConstructor;
+import org.gb.stellarplayer.Entites.Role;
 import org.gb.stellarplayer.Entites.User;
 import org.gb.stellarplayer.Exception.BadRequestException;
+import org.gb.stellarplayer.Model.Enum.EnumUserRole;
+import org.gb.stellarplayer.Repository.RoleRepository;
 import org.gb.stellarplayer.Repository.UserRepository;
 import org.gb.stellarplayer.Service.UserAdminService;
 import org.gb.stellarplayer.Service.UserSubscriptionService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -22,10 +29,156 @@ import java.util.stream.Collectors;
 public class UserAdminServiceImpl implements UserAdminService {
     private final UserRepository userRepository;
     private final UserSubscriptionService userSubscriptionService;
+    private final RoleRepository roleRepository;
 
     @Override
     public long getTotalUsersCount() {
         return userRepository.count();
+    }
+
+    @Override
+    public Page<Map<String, Object>> getAllUsers(Pageable pageable, String search) {
+        Page<User> users = userRepository.findUsersWithSearch(search, pageable);
+        
+        List<Map<String, Object>> usersList = users.getContent().stream()
+                .map(user -> {
+                    Map<String, Object> userMap = new HashMap<>();
+                    userMap.put("id", user.getId());
+                    userMap.put("name", user.getName());
+                    userMap.put("email", user.getEmail());
+                    userMap.put("enabled", user.getEnabled());
+                    userMap.put("createdAt", user.getCreatedAt());
+                    userMap.put("updatedAt", user.getUpdatedAt());
+                    userMap.put("avatar", user.getAvatar());
+                    userMap.put("dob", user.getDob());
+                    
+                    // Add subscription status
+                    boolean isSubscribed = isUserSubscribed(user);
+                    userMap.put("isSubscribed", isSubscribed);
+                    
+                    // Add role information
+                    List<String> roles = user.getRoles().stream()
+                            .map(role -> role.getName().name())
+                            .collect(Collectors.toList());
+                    userMap.put("roles", roles);
+                    
+                    return userMap;
+                })
+                .collect(Collectors.toList());
+        
+        return new PageImpl<>(usersList, pageable, users.getTotalElements());
+    }
+
+    @Override
+    public Page<Map<String, Object>> getSubscribedUsers(Pageable pageable, String search) {
+        Page<User> subscribedUsers = userRepository.findSubscribedUsersWithSearch(search, pageable);
+        
+        List<Map<String, Object>> usersList = subscribedUsers.getContent().stream()
+                .map(user -> {
+                    Map<String, Object> userMap = new HashMap<>();
+                    userMap.put("id", user.getId());
+                    userMap.put("name", user.getName());
+                    userMap.put("email", user.getEmail());
+                    userMap.put("enabled", user.getEnabled());
+                    userMap.put("createdAt", user.getCreatedAt());
+                    userMap.put("updatedAt", user.getUpdatedAt());
+                    userMap.put("avatar", user.getAvatar());
+                    userMap.put("dob", user.getDob());
+                    
+                    // Add current subscription details
+                    Map<String, Object> subscriptionDetails = getCurrentSubscriptionDetails(user.getId());
+                    userMap.put("currentSubscription", subscriptionDetails);
+                    
+                    // Add longest subscription duration
+                    Integer longestDuration = userRepository.findLongestSubscriptionDuration(user.getId());
+                    userMap.put("longestSubscriptionDays", longestDuration != null ? longestDuration : 0);
+                    
+                    // Add role information
+                    List<String> roles = user.getRoles().stream()
+                            .map(role -> role.getName().name())
+                            .collect(Collectors.toList());
+                    userMap.put("roles", roles);
+                    
+                    return userMap;
+                })
+                .collect(Collectors.toList());
+        
+        return new PageImpl<>(usersList, pageable, subscribedUsers.getTotalElements());
+    }
+
+    @Override
+    public Map<String, Object> updateUserStatus(Integer userId, boolean disable, String reason) {
+        boolean newStatus = !disable; // enabled = !disable
+        int updatedRows = userRepository.updateUserEnabledStatus(userId, newStatus);
+        
+        if (updatedRows == 0) {
+            throw new BadRequestException("Failed to update user status. User may not exist.");
+        }
+        
+        Map<String, Object> result = new HashMap<>();
+        result.put("userId", userId);
+        result.put("enabled", newStatus);
+        result.put("disabled", disable);
+        result.put("reason", reason);
+        result.put("updatedAt", LocalDateTime.now());
+        result.put("action", disable ? "DISABLED" : "ENABLED");
+        
+        return result;
+    }
+
+    /**
+     * Get current subscription details for a user
+     */
+    private Map<String, Object> getCurrentSubscriptionDetails(Integer userId) {
+        Map<String, Object> subscriptionDetails = new HashMap<>();
+        
+        try {
+            List<Object[]> currentSubscriptions = userRepository.findCurrentSubscription(userId);
+            
+            if (!currentSubscriptions.isEmpty()) {
+                Object[] currentSub = currentSubscriptions.get(0); // Get the most recent active subscription
+                
+                subscriptionDetails.put("hasActiveSubscription", true);
+                subscriptionDetails.put("subscriptionCount", currentSubscriptions.size());
+                
+                // Extract subscription plan details
+                // Object[] format: [us.id, us.startDate, us.endDate, us.isActive, s.id, s.name, s.price, s.dateType]
+                subscriptionDetails.put("subscriptionId", currentSub[0]);
+                subscriptionDetails.put("startDate", currentSub[1]);
+                subscriptionDetails.put("endDate", currentSub[2]);
+                subscriptionDetails.put("isActive", currentSub[3]);
+                subscriptionDetails.put("planId", currentSub[4]);
+                subscriptionDetails.put("planName", currentSub[5]); 
+                subscriptionDetails.put("planPrice", currentSub[6]);
+                subscriptionDetails.put("planDateType", currentSub[7]);
+                
+            } else {
+                subscriptionDetails.put("hasActiveSubscription", false);
+                subscriptionDetails.put("subscriptionCount", 0);
+                subscriptionDetails.put("planName", null);
+            }
+            
+            // Get longest subscription details
+            List<Object[]> allSubscriptions = userRepository.findAllUserSubscriptions(userId);
+            if (!allSubscriptions.isEmpty()) {
+                Object[] longestSub = allSubscriptions.get(0); // First one is longest due to ORDER BY
+                
+                subscriptionDetails.put("longestSubscription", Map.of(
+                    "planName", longestSub[5], // Longest subscription plan name
+                    "durationDays", longestSub[8],
+                    "startDate", longestSub[1],
+                    "endDate", longestSub[2]
+                ));
+            }
+            
+        } catch (Exception e) {
+            subscriptionDetails.put("hasActiveSubscription", false);
+            subscriptionDetails.put("subscriptionCount", 0);
+            subscriptionDetails.put("planName", null);
+            subscriptionDetails.put("error", "Could not fetch subscription details: " + e.getMessage());
+        }
+        
+        return subscriptionDetails;
     }
 
     @Override
@@ -110,76 +263,38 @@ public class UserAdminServiceImpl implements UserAdminService {
     @Override
     public Map<String, Object> getWeeklyUserAnalytics() {
         LocalDateTime now = LocalDateTime.now();
-        YearMonth currentMonth = YearMonth.now();
-        LocalDateTime startOfMonth = currentMonth.atDay(1).atStartOfDay();
+        
+        // Get current week range
+        LocalDate today = LocalDate.now();
+        LocalDate weekStart = today.minusDays(today.getDayOfWeek().getValue() - 1); // Monday
+        LocalDate weekEnd = weekStart.plusDays(6); // Sunday
+        
+        LocalDateTime weekStartDateTime = weekStart.atStartOfDay();
+        LocalDateTime weekEndDateTime = weekEnd.atTime(23, 59, 59);
+        
+        // Get users registered in this week
+        List<User> weekUsers = userRepository.findAll().stream()
+                .filter(user -> user.getCreatedAt() != null &&
+                        user.getCreatedAt().isAfter(weekStartDateTime) &&
+                        user.getCreatedAt().isBefore(weekEndDateTime.plusDays(1)))
+                .collect(Collectors.toList());
+        
+        // Count subscribed users in this week
+        long subscribedCount = weekUsers.stream()
+                .filter(this::isUserSubscribed)
+                .count();
+        
+        int totalNewUsers = weekUsers.size();
+        double subscriptionRate = totalNewUsers > 0 ? 
+            Math.round((subscribedCount * 100.0 / totalNewUsers) * 100.0) / 100.0 : 0.0;
         
         Map<String, Object> response = new HashMap<>();
-        response.put("month", currentMonth.toString());
-        response.put("month_name", currentMonth.getMonth().toString());
-        response.put("year", currentMonth.getYear());
+        response.put("week_period", weekStart.toString() + " to " + weekEnd.toString());
+        response.put("total_new_users", totalNewUsers);
+        response.put("subscribed_users", subscribedCount);
+        response.put("non_subscribed_users", totalNewUsers - subscribedCount);
+        response.put("subscription_rate", subscriptionRate);
         response.put("generated_at", now);
-        
-        List<Map<String, Object>> weeklyData = new ArrayList<>();
-        int totalNewUsers = 0;
-        int totalSubscribedUsers = 0;
-        
-        // Calculate weeks in current month
-        LocalDate firstDay = currentMonth.atDay(1);
-        LocalDate lastDay = currentMonth.atEndOfMonth();
-        
-        LocalDate weekStart = firstDay;
-        int weekNumber = 1;
-        
-        while (!weekStart.isAfter(lastDay)) {
-            LocalDate weekEnd = weekStart.plusDays(6);
-            if (weekEnd.isAfter(lastDay)) {
-                weekEnd = lastDay;
-            }
-            
-            LocalDateTime weekStartDateTime = weekStart.atStartOfDay();
-            LocalDateTime weekEndDateTime = weekEnd.atTime(23, 59, 59);
-            
-            // Get users registered in this week
-            List<User> weekUsers = userRepository.findAll().stream()
-                    .filter(user -> user.getCreatedAt() != null &&
-                            user.getCreatedAt().isAfter(weekStartDateTime) &&
-                            user.getCreatedAt().isBefore(weekEndDateTime.plusDays(1)))
-                    .collect(Collectors.toList());
-            
-            // Count subscribed users in this week
-            long subscribedCount = weekUsers.stream()
-                    .filter(this::isUserSubscribed)
-                    .count();
-            
-            int weekNewUsers = weekUsers.size();
-            totalNewUsers += weekNewUsers;
-            totalSubscribedUsers += subscribedCount;
-            
-            Map<String, Object> weekData = new HashMap<>();
-            weekData.put("week_number", weekNumber);
-            weekData.put("week_start", weekStart.toString());
-            weekData.put("week_end", weekEnd.toString());
-            weekData.put("new_users", weekNewUsers);
-            weekData.put("subscribed_users", subscribedCount);
-            weekData.put("non_subscribed_users", weekNewUsers - subscribedCount);
-            weekData.put("subscription_rate", weekNewUsers > 0 ? 
-                Math.round((subscribedCount * 100.0 / weekNewUsers) * 100.0) / 100.0 : 0.0);
-            
-            weeklyData.add(weekData);
-            
-            weekStart = weekStart.plusDays(7);
-            weekNumber++;
-        }
-        
-        response.put("weekly_breakdown", weeklyData);
-        response.put("month_summary", Map.of(
-            "total_new_users", totalNewUsers,
-            "total_subscribed_users", totalSubscribedUsers,
-            "total_non_subscribed_users", totalNewUsers - totalSubscribedUsers,
-            "overall_subscription_rate", totalNewUsers > 0 ? 
-                Math.round((totalSubscribedUsers * 100.0 / totalNewUsers) * 100.0) / 100.0 : 0.0,
-            "weeks_in_month", weeklyData.size()
-        ));
         
         return response;
     }
@@ -221,7 +336,7 @@ public class UserAdminServiceImpl implements UserAdminService {
             monthData.put("month_number", month);
             monthData.put("month_name", yearMonth.getMonth().toString());
             monthData.put("month_year", yearMonth.toString());
-            monthData.put("new_users", monthNewUsers);
+            monthData.put("total_new_users", monthNewUsers);
             monthData.put("subscribed_users", subscribedCount);
             monthData.put("non_subscribed_users", monthNewUsers - subscribedCount);
             monthData.put("subscription_rate", monthNewUsers > 0 ? 
@@ -236,8 +351,7 @@ public class UserAdminServiceImpl implements UserAdminService {
             "total_subscribed_users", totalSubscribedUsers,
             "total_non_subscribed_users", totalNewUsers - totalSubscribedUsers,
             "overall_subscription_rate", totalNewUsers > 0 ? 
-                Math.round((totalSubscribedUsers * 100.0 / totalNewUsers) * 100.0) / 100.0 : 0.0,
-            "average_monthly_users", Math.round((totalNewUsers / 12.0) * 100.0) / 100.0
+                Math.round((totalSubscribedUsers * 100.0 / totalNewUsers) * 100.0) / 100.0 : 0.0
         ));
         
         return response;
@@ -249,45 +363,21 @@ public class UserAdminServiceImpl implements UserAdminService {
         
         Map<String, Object> response = new HashMap<>();
         response.put("current_year", currentYear);
-        response.put("future_years_projected", futureYears);
         response.put("generated_at", LocalDateTime.now());
         
         List<Map<String, Object>> yearlyData = new ArrayList<>();
         
-        // Historical data for current year and past 2 years
-        for (int i = 2; i >= 0; i--) {
-            int year = currentYear - i;
-            Map<String, Object> yearData = getYearUserData(year, false);
-            yearlyData.add(yearData);
-        }
+        // Historical data for current year and past years, plus future projections
+        int startYear = currentYear - 2; // Show 2 years back
+        int endYear = currentYear + futureYears;
         
-        // Projected data for future years
-        for (int i = 1; i <= futureYears; i++) {
-            int year = currentYear + i;
-            Map<String, Object> yearData = getYearUserData(year, true);
+        for (int year = startYear; year <= endYear; year++) {
+            boolean isProjection = year > currentYear;
+            Map<String, Object> yearData = getYearUserData(year, isProjection);
             yearlyData.add(yearData);
         }
         
         response.put("yearly_breakdown", yearlyData);
-        
-        // Calculate growth trends
-        if (yearlyData.size() >= 2) {
-            Map<String, Object> currentYearData = (Map<String, Object>) yearlyData.get(yearlyData.size() - futureYears - 1);
-            Map<String, Object> previousYearData = (Map<String, Object>) yearlyData.get(yearlyData.size() - futureYears - 2);
-            
-            int currentUsers = (Integer) currentYearData.get("new_users");
-            int previousUsers = (Integer) previousYearData.get("new_users");
-            
-            double growthRate = previousUsers > 0 ? 
-                ((currentUsers - previousUsers) * 100.0 / previousUsers) : 0.0;
-            
-            response.put("growth_analysis", Map.of(
-                "year_over_year_growth", Math.round(growthRate * 100.0) / 100.0,
-                "growth_trend", growthRate > 10 ? "HIGH_GROWTH" : 
-                               growthRate > 0 ? "MODERATE_GROWTH" : 
-                               growthRate > -10 ? "SLIGHT_DECLINE" : "SIGNIFICANT_DECLINE"
-            ));
-        }
         
         return response;
     }
@@ -323,36 +413,6 @@ public class UserAdminServiceImpl implements UserAdminService {
         response.put("subscription_rate", totalUsers > 0 ? 
             Math.round((subscribedUsers * 100.0 / totalUsers) * 100.0) / 100.0 : 0.0);
         response.put("generated_at", LocalDateTime.now());
-        
-        // Breakdown by registration date (last 12 months)
-        List<Map<String, Object>> monthlyBreakdown = new ArrayList<>();
-        for (int i = 11; i >= 0; i--) {
-            YearMonth month = YearMonth.now().minusMonths(i);
-            LocalDateTime startOfMonth = month.atDay(1).atStartOfDay();
-            LocalDateTime endOfMonth = month.atEndOfMonth().atTime(23, 59, 59);
-            
-            List<User> monthUsers = allUsers.stream()
-                    .filter(user -> user.getCreatedAt() != null &&
-                            user.getCreatedAt().isAfter(startOfMonth) &&
-                            user.getCreatedAt().isBefore(endOfMonth.plusDays(1)))
-                    .collect(Collectors.toList());
-            
-            long monthSubscribed = monthUsers.stream()
-                    .filter(this::isUserSubscribed)
-                    .count();
-            
-            monthlyBreakdown.add(Map.of(
-                "month", month.toString(),
-                "month_name", month.getMonth().toString(),
-                "total_users", monthUsers.size(),
-                "subscribed_users", monthSubscribed,
-                "non_subscribed_users", monthUsers.size() - monthSubscribed,
-                "subscription_rate", monthUsers.size() > 0 ? 
-                    Math.round((monthSubscribed * 100.0 / monthUsers.size()) * 100.0) / 100.0 : 0.0
-            ));
-        }
-        
-        response.put("monthly_subscription_breakdown", monthlyBreakdown);
         
         return response;
     }
@@ -405,13 +465,9 @@ public class UserAdminServiceImpl implements UserAdminService {
 
     // Helper methods
     private boolean isUserSubscribed(User user) {
-        // Check if user has active subscription
         try {
-            return userSubscriptionService.getTotalActiveSubscriptionsCount() > 0 && 
-                   userSubscriptionService.getNewSubscriptionsCountByPeriod("year").values().stream()
-                       .anyMatch(count -> count > 0);
-            // This is a simplified check - you might want to implement a more specific method
-            // in UserSubscriptionService to check individual user subscription status
+            // Check if user has any active subscription by querying the database directly
+            return userRepository.findCurrentSubscription(user.getId()).size() > 0;
         } catch (Exception e) {
             return false; // Default to not subscribed if there's an error
         }
@@ -420,7 +476,6 @@ public class UserAdminServiceImpl implements UserAdminService {
     private Map<String, Object> getYearUserData(int year, boolean isProjection) {
         Map<String, Object> yearData = new HashMap<>();
         yearData.put("year", year);
-        yearData.put("is_projection", isProjection);
         
         if (!isProjection) {
             // Historical data
@@ -437,32 +492,84 @@ public class UserAdminServiceImpl implements UserAdminService {
                     .filter(this::isUserSubscribed)
                     .count();
             
-            yearData.put("new_users", yearUsers.size());
-            yearData.put("subscribed_users", subscribedCount);
-            yearData.put("non_subscribed_users", yearUsers.size() - subscribedCount);
-        } else {
-            // Projected data based on current trends
-            Map<String, Long> currentYearData = getNewUsersCountByPeriod("year");
-            double currentYearUsers = currentYearData.getOrDefault("last_12_months", 0L);
-            double projectedUsers = currentYearUsers * 1.1; // 10% growth assumption
-            double projectedSubscribed = projectedUsers * 0.3; // 30% subscription rate assumption
+            int totalUsers = yearUsers.size();
+            double subscriptionRate = totalUsers > 0 ? 
+                Math.round((subscribedCount * 100.0 / totalUsers) * 100.0) / 100.0 : 0.0;
             
-            yearData.put("new_users", Math.round(projectedUsers));
-            yearData.put("subscribed_users", Math.round(projectedSubscribed));
-            yearData.put("non_subscribed_users", Math.round(projectedUsers - projectedSubscribed));
+            yearData.put("total_new_users", totalUsers);
+            yearData.put("subscribed_users", subscribedCount);
+            yearData.put("non_subscribed_users", totalUsers - subscribedCount);
+            yearData.put("subscription_rate", subscriptionRate);
+        } else {
+            // Projected data based on current trends - return 0 for future years
+            yearData.put("total_new_users", 0);
+            yearData.put("subscribed_users", 0);
+            yearData.put("non_subscribed_users", 0);
+            yearData.put("subscription_rate", 0.0);
         }
         
         return yearData;
     }
 
     private long getNewUsersCountByPeriodForMonth(YearMonth month) {
+        List<User> allUsers = userRepository.findAll();
         LocalDateTime startOfMonth = month.atDay(1).atStartOfDay();
         LocalDateTime endOfMonth = month.atEndOfMonth().atTime(23, 59, 59);
         
-        return userRepository.findAll().stream()
+        return allUsers.stream()
                 .filter(user -> user.getCreatedAt() != null &&
                         user.getCreatedAt().isAfter(startOfMonth) &&
-                        user.getCreatedAt().isBefore(endOfMonth.plusDays(1)))
+                        user.getCreatedAt().isBefore(endOfMonth))
                 .count();
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> updateUserRole(Integer userId, String newRole) {
+        // Validate user exists
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("User not found with ID: " + userId));
+        
+        // Validate role - only USER and ARTIST are allowed
+        EnumUserRole enumRole;
+        try {
+            enumRole = EnumUserRole.valueOf(newRole.toUpperCase());
+            if (enumRole != EnumUserRole.USER && enumRole != EnumUserRole.ARTIST) {
+                throw new BadRequestException("Invalid role: " + newRole + ". Only USER and ARTIST roles can be assigned");
+            }
+        } catch (IllegalArgumentException e) {
+            throw new BadRequestException("Invalid role: " + newRole + ". Valid roles are: USER, ARTIST");
+        }
+        
+        // Get the role entity
+        Role role = roleRepository.findByName(enumRole)
+                .orElseThrow(() -> new BadRequestException("Role not found: " + newRole));
+        
+        // Store previous roles for response
+        List<String> previousRoles = user.getRoles().stream()
+                .map(r -> r.getName().name())
+                .collect(Collectors.toList());
+        
+        // Update user roles - replace all roles with the new one (using List instead of Set)
+        List<Role> newRoles = new ArrayList<>();
+        newRoles.add(role);
+        user.setRoles(newRoles);
+        user.setUpdatedAt(LocalDateTime.now());
+        
+        // Save user
+        User updatedUser = userRepository.save(user);
+        
+        // Prepare response
+        Map<String, Object> result = new HashMap<>();
+        result.put("userId", userId);
+        result.put("username", user.getName());
+        result.put("email", user.getEmail());
+        result.put("previousRoles", previousRoles);
+        result.put("newRole", newRole.toUpperCase());
+        result.put("updatedAt", LocalDateTime.now());
+        result.put("success", true);
+        result.put("message", "User role updated successfully");
+        
+        return result;
     }
 } 

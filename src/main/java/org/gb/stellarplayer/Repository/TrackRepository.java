@@ -56,6 +56,8 @@ public interface TrackRepository extends JpaRepository<Track, Integer> {
    
    List<Track> findByStatusTrueAndCreatedAtAfterOrderByCreatedAtDesc(LocalDateTime since);
    
+   Page<Track> findByStatusFalse(Pageable pageable);
+   
    @Query(value = "SELECT DISTINCT t.* FROM track t " +
            "INNER JOIN track_genre tg ON t.id = tg.track_id " +
            "WHERE tg.genre_id IN :genreIds AND t.status = true " +

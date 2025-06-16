@@ -4,15 +4,22 @@ import lombok.RequiredArgsConstructor;
 import org.gb.stellarplayer.Entites.User;
 import org.gb.stellarplayer.Exception.BadRequestException;
 import org.gb.stellarplayer.Repository.UserRepository;
+import org.gb.stellarplayer.Request.UpdateUserRoleRequest;
 import org.gb.stellarplayer.Service.UserAdminService;
 import org.gb.stellarplayer.Service.UserSubscriptionService;
 import org.gb.stellarplayer.Ultils.JwtUtil;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Admin-only controller for user management and analytics
@@ -26,6 +33,163 @@ public class UserMngApi {
     private final UserSubscriptionService userSubscriptionService;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
+
+    /**
+     * Get all users with pagination and filtering
+     * @param page Page number (default: 0)
+     * @param size Page size (default: 20)
+     * @param search Search term for filtering by name or email
+     * @param sortBy Field to sort by (default: id)
+     * @param sortDir Sort direction (asc/desc, default: asc)
+     * @param token Admin authentication token
+     * @return Paginated list of users
+     */
+    @GetMapping
+    public ResponseEntity<Map<String, Object>> getUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir,
+            @RequestHeader("Authorization") String token) {
+        validateAdminToken(token);
+        
+        Sort sort = sortDir.equalsIgnoreCase("desc") ? 
+            Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
+        
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Page<Map<String, Object>> users = userAdminService.getAllUsers(pageable, search);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("users", users.getContent());
+        response.put("currentPage", users.getNumber());
+        response.put("totalPages", users.getTotalPages());
+        response.put("totalElements", users.getTotalElements());
+        response.put("size", users.getSize());
+        response.put("hasNext", users.hasNext());
+        response.put("hasPrevious", users.hasPrevious());
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get all subscribed users with subscription details
+     * @param page Page number (default: 0)
+     * @param size Page size (default: 20)
+     * @param search Search term for filtering by name or email
+     * @param sortBy Field to sort by (default: id)
+     * @param sortDir Sort direction (asc/desc, default: asc)
+     * @param token Admin authentication token
+     * @return Paginated list of subscribed users with subscription pack details and longest subscription info
+     */
+    @GetMapping("/subscribed")
+    public ResponseEntity<Map<String, Object>> getSubscribedUsers(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "id") String sortBy,
+            @RequestParam(defaultValue = "asc") String sortDir,
+            @RequestHeader("Authorization") String token) {
+        validateAdminToken(token);
+        
+        Sort sort = sortDir.equalsIgnoreCase("desc") ? 
+            Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
+        
+        Pageable pageable = PageRequest.of(page, size, sort);
+        Page<Map<String, Object>> subscribedUsers = userAdminService.getSubscribedUsers(pageable, search);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("subscribedUsers", subscribedUsers.getContent());
+        response.put("currentPage", subscribedUsers.getNumber());
+        response.put("totalPages", subscribedUsers.getTotalPages());
+        response.put("totalElements", subscribedUsers.getTotalElements());
+        response.put("size", subscribedUsers.getSize());
+        response.put("hasNext", subscribedUsers.hasNext());
+        response.put("hasPrevious", subscribedUsers.hasPrevious());
+        
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Disable/Enable user account
+     * @param userId User ID to disable/enable
+     * @param action Action to perform ("disable" or "enable")
+     * @param reason Reason for disabling (optional)
+     * @param token Admin authentication token
+     * @return Success message
+     */
+    @PutMapping("/{userId}/status")
+    public ResponseEntity<Map<String, Object>> updateUserStatus(
+            @PathVariable Integer userId,
+            @RequestParam String action,
+            @RequestParam(required = false) String reason,
+            @RequestHeader("Authorization") String token) {
+        validateAdminToken(token);
+        
+        if (!action.equals("disable") && !action.equals("enable")) {
+            throw new BadRequestException("Action must be 'disable' or 'enable'");
+        }
+        
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            throw new BadRequestException("User not found with ID: " + userId);
+        }
+        
+        User user = userOpt.get();
+        boolean disable = action.equals("disable");
+        
+        Map<String, Object> result = userAdminService.updateUserStatus(userId, disable, reason);
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", disable ? "User disabled successfully" : "User enabled successfully");
+        response.put("userId", userId);
+        response.put("username", user.getName());
+        response.put("action", action);
+        response.put("reason", reason);
+        response.put("updatedAt", result.get("updatedAt"));
+        
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Update user role
+     * @param userId User ID to update role for
+     * @param request Request body containing the new role
+     * @param token Admin authentication token
+     * @return Success response with updated user information
+     */
+    @PutMapping("/{userId}/role")
+    public ResponseEntity<Map<String, Object>> updateUserRole(
+            @PathVariable Integer userId,
+            @RequestBody UpdateUserRoleRequest request,
+            @RequestHeader("Authorization") String token) {
+        validateAdminToken(token);
+        
+        if (request.getRole() == null || request.getRole().trim().isEmpty()) {
+            throw new BadRequestException("Role cannot be null or empty");
+        }
+        
+        // Validate that user exists
+        Optional<User> userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            throw new BadRequestException("User not found with ID: " + userId);
+        }
+        
+        User user = userOpt.get();
+        
+        Map<String, Object> result = userAdminService.updateUserRole(userId, request.getRole());
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "User role updated successfully");
+        response.put("userId", userId);
+        response.put("username", user.getName());
+        response.put("previousRoles", result.get("previousRoles"));
+        response.put("newRole", result.get("newRole"));
+        response.put("updatedAt", result.get("updatedAt"));
+        
+        return ResponseEntity.ok(response);
+    }
 
     /**
      * Get total users count
@@ -239,5 +403,15 @@ public class UserMngApi {
     private boolean hasAdminRole(User user) {
         return user.getRoles().stream()
                 .anyMatch(role -> role.getName().name().equals("ADMIN"));
+    }
+
+    /**
+     * Get current username from token
+     * @param token Admin authentication token
+     * @return Current username
+     */
+    private String getCurrentUsernameFromToken(String token) {
+        String jwt = token.substring(7);
+        return jwtUtil.getUserNameFromJwtToken(jwt);
     }
 }

@@ -716,4 +716,138 @@ public class SongUploadService {
         
         return null; // No updates needed
     }
+    
+    /**
+     * Upload song with specified status (for approval workflow)
+     */
+    public Track uploadSongOptimizedWithStatus(MultipartFile audioFile, MultipartFile coverFile, UploadSongRequest request, boolean status) throws IOException {
+        log.info("Starting optimized song upload with status {} for: {}", status, request.getTitle());
+        
+        // Fast duplicate check using safe method
+        List<String> lowercaseArtistNames = request.getArtistNames().stream()
+            .map(name -> name.toLowerCase())
+            .collect(Collectors.toList());
+        boolean trackExists = checkForDuplicates(request.getTitle(), lowercaseArtistNames);
+        
+        if (trackExists) {
+            log.info("Duplicate found in optimized upload with status, checking for new artists/genres to add...");
+            // Use the available method to find tracks by artist names
+            List<Track> matchingTracks = trackRepository.findByArtistNamesIn(lowercaseArtistNames);
+            Track existingTrack = matchingTracks.stream()
+                .filter(track -> track.getTitle().toLowerCase().equals(request.getTitle().toLowerCase()))
+                .findFirst()
+                .orElse(null);
+            
+            if (existingTrack != null) {
+                // For optimized version, get cover URL first
+                String coverUrl = null;
+                if (coverFile != null && !coverFile.isEmpty()) {
+                    try {
+                        CloudinaryService.CloudinaryResponse coverResponse = cloudinaryService.uploadFile(coverFile, "covers");
+                        coverUrl = coverResponse.getUrl();
+                        log.info("Cover uploaded for track update: {}", coverUrl);
+                    } catch (IOException e) {
+                        log.warn("Cover upload failed during track update, continuing without cover: " + e.getMessage());
+                    }
+                }
+                
+                // Check for new artists and genres to add
+                Track updatedTrack = updateTrackWithNewArtistsAndGenres(existingTrack, request, coverUrl);
+                
+                if (updatedTrack != null) {
+                    log.info("Updated existing track '{}' with new artists/genres in optimized mode (ID: {})", 
+                        updatedTrack.getTitle(), updatedTrack.getId());
+                    return updatedTrack;
+                } else {
+                    // No new artists or genres, throw duplicate exception
+                    String artistNames = existingTrack.getArtists().stream()
+                        .map(Artist::getName)
+                        .collect(Collectors.joining(", "));
+                    
+                    throw new DuplicateSongException(
+                        existingTrack.getTitle(), 
+                        artistNames, 
+                        existingTrack.getId()
+                    );
+                }
+            }
+        }
+        
+        log.info("No duplicates found, proceeding with optimized upload with status {}...", status);
+        
+        try {
+            // Upload files in parallel using CompletableFuture
+            CompletableFuture<CloudinaryService.CloudinaryResponse> audioUploadFuture = 
+                CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return cloudinaryService.uploadAudio(audioFile, "tracks");
+                    } catch (IOException e) {
+                        throw new RuntimeException("Audio upload failed: " + e.getMessage(), e);
+                    }
+                });
+            
+            CompletableFuture<String> coverUploadFuture = 
+                CompletableFuture.supplyAsync(() -> {
+                    if (coverFile != null && !coverFile.isEmpty()) {
+                        try {
+                            CloudinaryService.CloudinaryResponse coverResponse = 
+                                cloudinaryService.uploadFile(coverFile, "covers");
+                            return coverResponse.getUrl();
+                        } catch (IOException e) {
+                            log.warn("Cover upload failed, continuing without cover: " + e.getMessage());
+                            return null;
+                        }
+                    }
+                    return null;
+                });
+            
+            // Wait for cover upload first since we need it for artist avatars
+            String coverUrl = coverUploadFuture.get();
+            
+            // Process artists and genres in parallel while audio uploads
+            CompletableFuture<List<Artist>> artistsFuture = 
+                CompletableFuture.supplyAsync(() -> getOrCreateArtistsBatch(request.getArtistNames(), coverUrl));
+            
+            CompletableFuture<List<Genre>> genresFuture = 
+                CompletableFuture.supplyAsync(() -> getOrCreateGenresBatch(request.getGenreNames()));
+            
+            // Wait for all parallel operations to complete
+            CloudinaryService.CloudinaryResponse audioResponse = audioUploadFuture.get();
+            List<Artist> artists = artistsFuture.get();
+            List<Genre> genres = genresFuture.get();
+            
+            log.info("All parallel operations completed successfully");
+            
+            // Get or create album (depends on artists, so can't be fully parallel)
+            Album album = getOrCreateAlbumOptimized(request.getAlbumTitle(), artists, coverUrl, request.getReleaseYear());
+            
+            // Calculate duration
+            int duration = audioResponse.getDuration() != null ? audioResponse.getDuration().intValue() : 0;
+            
+            // Create and save track with specified status
+            Track track = Track.builder()
+                    .title(request.getTitle())
+                    .duration(duration)
+                    .status(status) // Use the provided status
+                    .path(audioResponse.getUrl())
+                    .cover(coverUrl)
+                    .releaseYear(request.getReleaseYear())
+                    .album(album)
+                    .artists(artists)
+                    .genres(genres)
+                    .playCount(0L)
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+            
+            Track savedTrack = trackRepository.save(track);
+            log.info("Track saved successfully with ID: {} and status: {}", savedTrack.getId(), savedTrack.isStatus());
+            
+            return savedTrack;
+            
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Error in parallel processing: {}", e.getMessage());
+            throw new IOException("Upload processing failed: " + e.getMessage(), e);
+        }
+    }
 } 

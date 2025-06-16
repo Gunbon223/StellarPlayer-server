@@ -1,5 +1,7 @@
 package org.gb.stellarplayer.Service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import java.util.Map;
 
 /**
@@ -12,6 +14,31 @@ public interface UserAdminService {
      * @return Total count of users
      */
     long getTotalUsersCount();
+    
+    /**
+     * Get all users with pagination and search
+     * @param pageable Pagination information
+     * @param search Search term for filtering by name or email
+     * @return Page of users with their basic information
+     */
+    Page<Map<String, Object>> getAllUsers(Pageable pageable, String search);
+    
+    /**
+     * Get subscribed users with subscription details
+     * @param pageable Pagination information  
+     * @param search Search term for filtering by name or email
+     * @return Page of subscribed users with subscription pack details and longest subscription info
+     */
+    Page<Map<String, Object>> getSubscribedUsers(Pageable pageable, String search);
+    
+    /**
+     * Update user status (enable/disable)
+     * @param userId User ID to update
+     * @param disable True to disable, false to enable
+     * @param reason Reason for the action (optional)
+     * @return Map containing update result information
+     */
+    Map<String, Object> updateUserStatus(Integer userId, boolean disable, String reason);
     
     /**
      * Get new users count by period with breakdown
@@ -57,4 +84,12 @@ public interface UserAdminService {
      * @return Map containing growth trends and projections
      */
     Map<String, Object> getUserGrowthTrends();
+
+    /**
+     * Update user role
+     * @param userId User ID to update
+     * @param newRole New role to assign (USER, ARTIST, ADMIN)
+     * @return Map containing update result information
+     */
+    Map<String, Object> updateUserRole(Integer userId, String newRole);
 } 

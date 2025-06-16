@@ -55,8 +55,7 @@ public class TrackStatsServiceImpl implements TrackStatsService {
         result.put("last_played", track.getLastPlayedAt());
         result.put("start_date", start.toString());
         result.put("end_date", end.toString());
-        result.put("daily_plays", dailyPlayCounts);
-        result.put("avg_daily_plays", avgPlays);
+
         result.put("peak_day", getPeakDay(dailyPlayCounts));
         
         return result;

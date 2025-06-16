@@ -43,7 +43,6 @@ public class TrackStatsDTO {
                 .id(track.getId())
                 .title(track.getTitle())
                 .playCount(track.getPlayCount())
-                .lastPlayedAt(track.getLastPlayedAt())
                 .build();
     }
 } 

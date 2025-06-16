@@ -48,7 +48,7 @@ public class ContentBasedRecommendationService {
                     return RecommendationResponse.RecommendedTrack.builder()
                             .track(track)
                             .recommendationScore(similarity)
-                            .confidence(similarity * 0.8) // Content-based has 80% confidence
+                            .confidence(similarity * 0.8)
                             .reason("Based on your music preferences")
                             .tags(extractTrackTags(track))
                             .build();

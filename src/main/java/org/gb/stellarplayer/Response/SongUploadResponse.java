@@ -17,6 +17,10 @@ public class SongUploadResponse {
     private String message;
     private TrackInfo track;
     
+    public void setMessage(String message) {
+        this.message = message;
+    }
+    
     @Data
     @Builder
     @AllArgsConstructor

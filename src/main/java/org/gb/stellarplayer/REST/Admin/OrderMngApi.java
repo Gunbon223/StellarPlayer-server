@@ -321,7 +321,7 @@ public class OrderMngApi {
      */
     private boolean hasAdminRole(User user) {
         return user.getRoles().stream()
-                .anyMatch(role -> role.getName().name().equals("ROLE_ADMIN"));
+                .anyMatch(role -> role.getName().name().equals("ADMIN"));
     }
 
     /**

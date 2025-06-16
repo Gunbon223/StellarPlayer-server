@@ -6,6 +6,7 @@ import org.gb.stellarplayer.Entites.UserTrackInteraction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -80,4 +81,8 @@ public interface UserTrackInteractionRepository extends JpaRepository<UserTrackI
            "WHERE uti.user.id = :userId " +
            "ORDER BY uti.interactionScore DESC")
     List<UserTrackInteraction> findTopByUserIdOrderByInteractionScoreDesc(@Param("userId") Integer userId, Pageable pageable);
+
+    @Modifying
+    @Query("DELETE FROM UserTrackInteraction uti WHERE uti.track.id = :trackId")
+    void deleteByTrackId(@Param("trackId") Integer trackId);
 } 

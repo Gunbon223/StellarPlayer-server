@@ -2,10 +2,16 @@ package org.gb.stellarplayer.Service.Implement;
 
 import org.gb.stellarplayer.DTO.TrackAdminDTO;
 import org.gb.stellarplayer.Entites.Album;
+import org.gb.stellarplayer.Entites.Artist;
+import org.gb.stellarplayer.Entites.Playlist;
 import org.gb.stellarplayer.Entites.Track;
 import org.gb.stellarplayer.Exception.BadRequestException;
 import org.gb.stellarplayer.Repository.AlbumRepository;
+import org.gb.stellarplayer.Repository.HistoryRepository;
+import org.gb.stellarplayer.Repository.PlaylistRepository;
 import org.gb.stellarplayer.Repository.TrackRepository;
+import org.gb.stellarplayer.Repository.UserFavouriteTrackRepository;
+import org.gb.stellarplayer.Repository.UserTrackInteractionRepository;
 import org.gb.stellarplayer.Service.AlbumService;
 import org.gb.stellarplayer.Service.TrackService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -27,6 +34,14 @@ public class TrackServiceImp implements TrackService {
     TrackRepository trackRepository;
     @Autowired
     AlbumRepository albumRepository;
+    @Autowired
+    HistoryRepository historyRepository;
+    @Autowired
+    PlaylistRepository playlistRepository;
+    @Autowired
+    UserFavouriteTrackRepository userFavouriteTrackRepository;
+    @Autowired
+    UserTrackInteractionRepository userTrackInteractionRepository;
 
     @Override
     public List<Track> getTracks() {
@@ -153,8 +168,63 @@ public class TrackServiceImp implements TrackService {
         return response;
     }
     
+    @Override
+    public List<Track> getTracksByArtistId(int artistId) {
+        return trackRepository.findByArtistsIdOrderByCreatedAtDesc(artistId, Pageable.unpaged()).getContent();
+    }
+
+    @Override
+    public Page<Track> getUnapprovedTracks(Pageable pageable) {
+        return trackRepository.findByStatusFalse(pageable);
+    }
+    
     /**
      * Helper method to compare track DTOs by artist name
      */
 
+    @Transactional
+    @Override
+    public void deleteTrackWithCascade(int id) {
+        try {
+            // Verify track exists
+            Track track = getTrackById(id);
+            
+            System.out.println("Starting cascade delete for track: " + track.getTitle() + " (ID: " + id + ")");
+
+            // 1. Delete from history table
+            int deletedHistory = historyRepository.deleteByTrackId(id);
+            System.out.println("Deleted " + deletedHistory + " history entries for track");
+
+            // 2. Delete from user favorites
+            int deletedFavorites = userFavouriteTrackRepository.deleteByTrackId(id);
+            System.out.println("Deleted " + deletedFavorites + " favorite entries for track");
+
+            // 3. Delete from user track interactions
+            userTrackInteractionRepository.deleteByTrackId(id);
+            System.out.println("Deleted user track interactions for track");
+
+            // 4. Remove track from all playlists
+            List<Playlist> allPlaylists = playlistRepository.findAll();
+            for (Playlist playlist : allPlaylists) {
+                if (playlist.getTracks() != null) {
+                    boolean wasRemoved = playlist.getTracks().removeIf(t -> t.getId().equals(id));
+                    if (wasRemoved) {
+                        playlist.setUpdatedAt(LocalDateTime.now());
+                        playlistRepository.save(playlist);
+                        System.out.println("Removed track from playlist: " + playlist.getName());
+                    }
+                }
+            }
+
+            // 5. Finally delete the track itself
+            trackRepository.deleteById(id);
+            
+            System.out.println("Successfully deleted track: " + track.getTitle() + " (ID: " + id + ")");
+            
+        } catch (Exception e) {
+            System.err.println("Error during cascade delete: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to delete track with cascade: " + e.getMessage(), e);
+        }
+    }
 }

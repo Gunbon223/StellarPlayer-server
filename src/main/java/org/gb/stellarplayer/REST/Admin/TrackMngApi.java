@@ -139,6 +139,40 @@ public class TrackMngApi {
     }
 
     /**
+     * Update track status only (separate endpoint to avoid wiping other fields)
+     * @param id Track ID
+     * @param status New status value
+     * @param token Authentication token
+     * @return Updated track
+     */
+    @PutMapping("/{id}/status")
+    public ResponseEntity<?> updateTrackStatus(
+            @PathVariable int id,
+            @RequestParam boolean status,
+            @RequestHeader("Authorization") String token) {
+        validatePermission(token);
+        try {
+            // Get existing track
+            Track existingTrack = trackService.getTrackById(id);
+            
+            // Update only the status field
+            existingTrack.setStatus(status);
+            
+            // Save the updated track
+            Track updatedTrack = trackService.updateTrack(existingTrack);
+            TrackAdminDTO trackDTO = TrackAdminDTO.fromEntity(updatedTrack);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Track status updated successfully",
+                "track", trackDTO
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to update track status: " + e.getMessage()));
+        }
+    }
+
+    /**
      * Delete a track
      * @param id Track ID
      * @param token Authentication token
@@ -150,8 +184,18 @@ public class TrackMngApi {
             @RequestHeader("Authorization") String token) {
         validatePermission(token);
         try {
-            trackService.deleteTrack(id);
-            return ResponseEntity.ok(Map.of("message", "Track deleted successfully"));
+            // Get track details before deletion for response
+            Track track = trackService.getTrackById(id);
+            String trackTitle = track.getTitle();
+            
+            // Use cascade deletion to properly clean up related records
+            trackService.deleteTrackWithCascade(id);
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Track deleted successfully with all related data",
+                "track_title", trackTitle,
+                "track_id", id
+            ));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("message", "Failed to delete track: " + e.getMessage()));
