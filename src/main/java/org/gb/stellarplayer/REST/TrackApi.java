@@ -9,12 +9,14 @@ import org.gb.stellarplayer.Service.TrackService;
 import org.gb.stellarplayer.Service.TrackPlayService;
 import org.gb.stellarplayer.Ultils.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -36,13 +38,28 @@ public class TrackApi {
     UserRepository userRepository;
     
     @GetMapping("/{id}")
-    public Track getTrackById(@PathVariable int id) {
-        return trackService.getTrackById(id);
+    public ResponseEntity<?> getTrackById(@PathVariable int id) {
+        try {
+            Track track = trackService.getTrackById(id);
+            // Only return track if it's enabled
+            if (!track.isStatus()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "Track not found or not available"));
+            }
+            return ResponseEntity.ok(track);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("message", "Track not found"));
+        }
     }
     
     @GetMapping("/album/{id}")
     public List<Track> getTracksByAlbumId(@PathVariable int id) {
-        return trackService.getTrackByAlbumId(id);
+        List<Track> tracks = trackService.getTrackByAlbumId(id);
+        // Filter to only return enabled tracks
+        return tracks.stream()
+                .filter(Track::isStatus)
+                .collect(Collectors.toList());
     }
     
     /**
@@ -54,6 +71,15 @@ public class TrackApi {
     public ResponseEntity<Map<String, Object>> getTrackStats(@PathVariable int id) {
         try {
             Track track = trackService.getTrackById(id);
+            
+            // Only return stats if track is enabled
+            if (!track.isStatus()) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("error", "Track not found or not available");
+                error.put("message", "Track is disabled");
+                return (ResponseEntity<Map<String, Object>>) ResponseEntity.status(HttpStatus.NOT_FOUND);
+
+            }
             
             Map<String, Object> stats = new HashMap<>();
             stats.put("trackId", track.getId());
@@ -80,6 +106,14 @@ public class TrackApi {
     public ResponseEntity<Map<String, Object>> getTrackPlayCount(@PathVariable int id) {
         try {
             Track track = trackService.getTrackById(id);
+            
+            // Only return play count if track is enabled
+            if (!track.isStatus()) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("error", "Track not found or not available");
+                error.put("message", "Track is disabled");
+                return (ResponseEntity<Map<String, Object>>) ResponseEntity.status(HttpStatus.NOT_FOUND);
+            }
             
             Map<String, Object> response = new HashMap<>();
             response.put("trackId", track.getId());

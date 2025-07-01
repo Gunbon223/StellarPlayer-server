@@ -390,4 +390,40 @@ public class AlbumMngApi {
         
         return trackRequest;
     }
+
+    /**
+     * Get album of a specific track
+     * @param trackId Track ID
+     * @param token Authentication token
+     * @return Album information for the track
+     */
+    @GetMapping("/track/{trackId}/album")
+    public ResponseEntity<?> getTrackAlbum(
+            @PathVariable int trackId,
+            @RequestHeader("Authorization") String token) {
+        validatePermission(token);
+        try {
+            Track track = trackService.getTrackById(trackId);
+            
+            if (track.getAlbum() == null) {
+                return ResponseEntity.ok(Map.of(
+                    "track_id", track.getId(),
+                    "track_title", track.getTitle(),
+                    "album", null,
+                    "message", "Track is not assigned to any album"
+                ));
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                "track_id", track.getId(),
+                "track_title", track.getTitle(),
+                "album", track.getAlbum(),
+                "album_id", track.getAlbum().getId(),
+                "album_title", track.getAlbum().getTitle()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Failed to get track album: " + e.getMessage()));
+        }
+    }
 } 

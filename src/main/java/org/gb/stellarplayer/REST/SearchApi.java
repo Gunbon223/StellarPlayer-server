@@ -22,7 +22,7 @@ public class SearchApi {
             @RequestParam(required = false, defaultValue = "5") int limit)
              {
 
-        // Perform search
+        // Perform search (SearchService should filter to only enabled tracks/albums)
         SearchResultDTO results = searchService.search(query, limit);
         return ResponseEntity.ok(results);
     }

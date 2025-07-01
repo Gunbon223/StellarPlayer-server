@@ -39,17 +39,36 @@ public class AlbumApi {
 
     @GetMapping("/newest")
     public List<Album> getAllAlbums() {
-        return albumService.getAlbums();
+        List<Album> albums = albumService.getAlbums();
+        // Filter to only return enabled albums
+        return albums.stream()
+                .filter(Album::isStatus)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public Album getAlbumById(@PathVariable int id) {
-        return albumService.getAlbumById(id);
+    public ResponseEntity<?> getAlbumById(@PathVariable int id) {
+        try {
+            Album album = albumService.getAlbumById(id);
+            // Only return album if it's enabled
+            if (!album.isStatus()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "Album not found or not available"));
+            }
+            return ResponseEntity.ok(album);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("message", "Album not found"));
+        }
     }
 
     @GetMapping("/{id}/tracks")
     public List<Track> getTracksByAlbumId(@PathVariable int id) {
-        return trackService.getTrackByAlbumId(id);
+        List<Track> tracks = trackService.getTrackByAlbumId(id);
+        // Filter to only return enabled tracks
+        return tracks.stream()
+                .filter(Track::isStatus)
+                .collect(Collectors.toList());
     }
 
     @PostMapping

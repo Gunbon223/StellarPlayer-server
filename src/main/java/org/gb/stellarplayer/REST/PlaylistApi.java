@@ -53,12 +53,45 @@ public class PlaylistApi {
 
     @GetMapping("/newest")
     public List<Playlist> getAllPlaylists() {
-        return playlistService.getPlaylists();
+        List<Playlist> playlists = playlistService.getPlaylists();
+        // Filter to only return enabled playlists and filter their tracks
+        return playlists.stream()
+                .filter(Playlist::isStatus)
+                .peek(playlist -> {
+                    // Filter tracks within each playlist to only enabled ones
+                    if (playlist.getTracks() != null) {
+                        List<Track> enabledTracks = playlist.getTracks().stream()
+                                .filter(Track::isStatus)
+                                .collect(Collectors.toList());
+                        playlist.setTracks(enabledTracks);
+                    }
+                })
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public Playlist getPlaylistById(@PathVariable int id) {
-        return playlistService.getPlaylistById(id);
+    public ResponseEntity<?> getPlaylistById(@PathVariable int id) {
+        try {
+            Playlist playlist = playlistService.getPlaylistById(id);
+            // Only return playlist if it's enabled (for public playlists)
+            if (!playlist.isStatus() && playlist.getType() != PlaylistType.USER) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "Playlist not found or not available"));
+            }
+            
+            // Filter tracks to only show enabled ones
+            if (playlist.getTracks() != null) {
+                List<Track> enabledTracks = playlist.getTracks().stream()
+                        .filter(Track::isStatus)
+                        .collect(Collectors.toList());
+                playlist.setTracks(enabledTracks);
+            }
+            
+            return ResponseEntity.ok(playlist);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("message", "Playlist not found"));
+        }
     }
 
     // User playlist management endpoints
@@ -297,7 +330,12 @@ public class PlaylistApi {
                         .body(Map.of("message", "Access denied"));
             }
             
-            return ResponseEntity.ok(playlist.getTracks());
+            // Filter to only return enabled tracks
+            List<Track> enabledTracks = playlist.getTracks().stream()
+                    .filter(Track::isStatus)
+                    .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(enabledTracks);
         } catch (BadRequestException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("message", e.getMessage()));

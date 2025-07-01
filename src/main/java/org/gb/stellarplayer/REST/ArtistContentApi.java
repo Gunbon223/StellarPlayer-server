@@ -101,11 +101,13 @@ public class ArtistContentApi {
 
     /**
      * Update track (if user owns it)
+     * Artists can update: title, duration, cover, lyrics, release year, album assignment
+     * Artists CANNOT update: status (admin only), artist relationships
      */
     @PutMapping("/track/{id}")
     public ResponseEntity<?> updateTrack(
             @PathVariable int id,
-            @RequestBody TrackRequest trackRequest,
+            @RequestBody Map<String, Object> updateRequest,
             @RequestHeader("Authorization") String token) {
         User user = validateArtistToken(token);
         try {
@@ -114,13 +116,89 @@ public class ArtistContentApi {
                     .body(Map.of("message", "You don't have permission to update this track"));
             }
             
+            // Get existing track to preserve important relationships
             Track existingTrack = trackService.getTrackById(id);
-            Track trackToUpdate = convertRequestToTrack(trackRequest);
-            trackToUpdate.setId(id);
             
-            Track updatedTrack = trackService.updateTrack(trackToUpdate);
+            // Update basic metadata fields
+            if (updateRequest.containsKey("title")) {
+                String title = (String) updateRequest.get("title");
+                if (title != null && !title.trim().isEmpty()) {
+                    existingTrack.setTitle(title);
+                }
+            }
+            
+            if (updateRequest.containsKey("duration")) {
+                Integer duration = (Integer) updateRequest.get("duration");
+                if (duration != null && duration > 0) {
+                    existingTrack.setDuration(duration);
+                }
+            }
+            
+            if (updateRequest.containsKey("cover")) {
+                String cover = (String) updateRequest.get("cover");
+                existingTrack.setCover(cover);
+            }
+            
+            if (updateRequest.containsKey("lyrics")) {
+                String lyrics = (String) updateRequest.get("lyrics");
+                existingTrack.setLyrics(lyrics);
+            }
+            
+            if (updateRequest.containsKey("releaseYear")) {
+                Integer releaseYear = (Integer) updateRequest.get("releaseYear");
+                if (releaseYear != null && releaseYear > 0) {
+                    existingTrack.setReleaseYear(releaseYear);
+                }
+            }
+            
+            // Handle album assignment by album name
+            if (updateRequest.containsKey("albumName")) {
+                String albumName = (String) updateRequest.get("albumName");
+                
+                if (albumName == null || albumName.trim().isEmpty()) {
+                    // Remove from current album
+                    existingTrack.setAlbum(null);
+                } else {
+                    // Find album by name among user's manageable albums
+                    List<Artist> userArtists = userArtistService.getUserArtists(user.getId());
+                    Album targetAlbum = null;
+                    
+                    for (Artist artist : userArtists) {
+                        List<Album> artistAlbums = albumService.getAlbumsByArtistId(artist.getId());
+                        targetAlbum = artistAlbums.stream()
+                            .filter(album -> album.getTitle().equalsIgnoreCase(albumName.trim()))
+                            .findFirst()
+                            .orElse(null);
+                        if (targetAlbum != null) break;
+                    }
+                    
+                    if (targetAlbum == null) {
+                        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body(Map.of("message", "Album '" + albumName + "' not found or you don't have permission to assign tracks to it"));
+                    }
+                    
+                    existingTrack.setAlbum(targetAlbum);
+                }
+            }
+            
+            // Fields that artists CANNOT change:
+            // - status (admin only approval required)
+            // - artist relationships (would require more complex validation)
+            // - playCount (should not be manually editable)
+            // - path (file path should not change through updates)
+            
+            Track updatedTrack = trackService.updateTrack(existingTrack);
             TrackAdminDTO trackDTO = TrackAdminDTO.fromEntity(updatedTrack);
-            return ResponseEntity.ok(trackDTO);
+            
+            String albumInfo = updatedTrack.getAlbum() != null ? 
+                "assigned to album '" + updatedTrack.getAlbum().getTitle() + "'" : 
+                "removed from album";
+            
+            return ResponseEntity.ok(Map.of(
+                "message", "Track updated successfully. " + (updateRequest.containsKey("albumName") ? "Album " + albumInfo + "." : ""),
+                "track", trackDTO,
+                "note", "Status changes require admin approval"
+            ));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("message", "Failed to update track: " + e.getMessage()));
@@ -288,9 +366,12 @@ public class ArtistContentApi {
 
     /**
      * Delete album (if user owns it)
+     * This will also clean up all related records (history, favorites, tracks, etc.)
      */
     @DeleteMapping("/album/{id}")
-    public ResponseEntity<?> deleteAlbum(@PathVariable int id, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<?> deleteAlbum(
+            @PathVariable int id,
+            @RequestHeader("Authorization") String token) {
         User user = validateArtistToken(token);
         try {
             if (!userArtistService.canUserManageAlbum(user.getId(), id)) {
@@ -298,17 +379,31 @@ public class ArtistContentApi {
                     .body(Map.of("message", "You don't have permission to delete this album"));
             }
             
+            // First verify album exists and get album details
             Album album = albumService.getAlbumById(id);
+            
+            // Get all tracks in the album for deletion count
+            List<Track> albumTracks = trackService.getTrackByAlbumId(id);
+            int trackCount = albumTracks.size();
+            
+            // Delete all tracks in the album with cascade (this will handle track favorites, history, etc.)
+            for (Track track : albumTracks) {
+                trackService.deleteTrackWithCascade(track.getId());
+            }
+            
+            // Delete album with proper cascade handling (favorites, history, etc.)
             albumService.deleteAlbumWithCascade(id);
             
             return ResponseEntity.ok(Map.of(
-                "message", "Album deleted successfully",
+                "message", "Album deleted successfully with all related data",
                 "album_title", album.getTitle(),
-                "album_id", id
+                "album_id", id,
+                "tracks_deleted", trackCount,
+                "details", "Deleted album, " + trackCount + " tracks, and all related favorites/history records"
             ));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("message", "Failed to delete album: " + e.getMessage()));
+                    .body(Map.of("message", "Failed to delete album: " + e.getMessage()));
         }
     }
 
@@ -384,6 +479,125 @@ public class ArtistContentApi {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("message", "Failed to remove track from album: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Get all tracks in a specific album (if user owns the album)
+     */
+    @GetMapping("/album/{id}/tracks")
+    public ResponseEntity<?> getAlbumTracks(@PathVariable int id, @RequestHeader("Authorization") String token) {
+        User user = validateArtistToken(token);
+        try {
+            if (!userArtistService.canUserManageAlbum(user.getId(), id)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "You don't have permission to access this album"));
+            }
+            
+            Album album = albumService.getAlbumById(id);
+            List<Track> albumTracks = trackService.getTrackByAlbumId(id);
+            
+            List<TrackAdminDTO> trackDTOs = albumTracks.stream()
+                .map(TrackAdminDTO::fromEntity)
+                .collect(Collectors.toList());
+            
+            return ResponseEntity.ok(Map.of(
+                "album", album,
+                "tracks", trackDTOs,
+                "total_tracks", trackDTOs.size()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to get album tracks: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Update album status (if user owns it)
+     * When disabling album: all tracks in the album will be disabled
+     * When enabling album: tracks remain disabled (need admin approval to enable tracks)
+     */
+    @PutMapping("/album/{id}/status")
+    public ResponseEntity<?> updateAlbumStatus(
+            @PathVariable int id,
+            @RequestParam boolean status,
+            @RequestHeader("Authorization") String token) {
+        User user = validateArtistToken(token);
+        try {
+            if (!userArtistService.canUserManageAlbum(user.getId(), id)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "You don't have permission to update this album"));
+            }
+            
+            // Get existing album
+            Album existingAlbum = albumService.getAlbumById(id);
+            
+            // Update album status
+            existingAlbum.setStatus(status);
+            Album updatedAlbum = albumService.updateAlbum(existingAlbum);
+            
+            // Handle track status based on album status
+            List<Track> albumTracks = trackService.getTrackByAlbumId(id);
+            int tracksUpdated = 0;
+            
+            if (!status) {
+                // When disabling album: disable all tracks in the album
+                for (Track track : albumTracks) {
+                    if (track.isStatus()) { // Only update if track is currently enabled
+                        track.setStatus(false);
+                        trackService.updateTrack(track);
+                        tracksUpdated++;
+                    }
+                }
+            }
+            // When enabling album: do NOT automatically enable tracks (admin approval required)
+            
+            String message = status ? 
+                "Album enabled successfully. Tracks remain disabled until admin approval." :
+                "Album disabled successfully. All " + tracksUpdated + " active tracks in the album have been disabled.";
+            
+            return ResponseEntity.ok(Map.of(
+                "message", message,
+                "album", updatedAlbum,
+                "tracks_affected", tracksUpdated
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to update album status: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Get album of a specific track (if user owns the track)
+     */
+    @GetMapping("/track/{id}/album")
+    public ResponseEntity<?> getTrackAlbum(@PathVariable int id, @RequestHeader("Authorization") String token) {
+        User user = validateArtistToken(token);
+        try {
+            if (!userArtistService.canUserManageTrack(user.getId(), id)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "You don't have permission to access this track"));
+            }
+            
+            Track track = trackService.getTrackById(id);
+            
+            if (track.getAlbum() == null) {
+                return ResponseEntity.ok(Map.of(
+                    "track_id", track.getId(),
+                    "track_title", track.getTitle(),
+                    "album", null,
+                    "message", "Track is not assigned to any album"
+                ));
+            }
+            
+            return ResponseEntity.ok(Map.of(
+                "track_id", track.getId(),
+                "track_title", track.getTitle(),
+                "album", track.getAlbum()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", "Failed to get track album: " + e.getMessage()));
         }
     }
 

@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @CrossOrigin(origins = "http://localhost:3000")
 @RestController
@@ -47,7 +48,20 @@ public class ArtistApi {
             @RequestParam(defaultValue = "desc") String sort) {
         PageRequest pageRequest = PageRequest.of(page, perPage, Sort.by(Sort.Direction.fromString(sort), "createdAt"));
         Page<Track> tracks = artistService.getTracksByArtistId(id, pageRequest);
-        return ResponseEntity.ok(tracks);
+        
+        // Filter to only return enabled tracks
+        List<Track> enabledTracks = tracks.getContent().stream()
+                .filter(Track::isStatus)
+                .collect(Collectors.toList());
+        
+        // Create a new Page with filtered content but preserve original pagination metadata
+        Page<Track> filteredTracks = new org.springframework.data.domain.PageImpl<>(
+                enabledTracks, 
+                pageRequest, 
+                tracks.getTotalElements()
+        );
+        
+        return ResponseEntity.ok(filteredTracks);
     }
 
     @GetMapping("/{id}/albums")
@@ -59,7 +73,20 @@ public class ArtistApi {
             @RequestParam(defaultValue = "desc") String sort) {
         PageRequest pageRequest = PageRequest.of(page, perPage, Sort.by(Sort.Direction.fromString(sort), "createdAt"));
         Page<Album> albums = artistService.getAlbumsByArtistId(id, pageRequest);
-        return ResponseEntity.ok(albums);
+        
+        // Filter to only return enabled albums
+        List<Album> enabledAlbums = albums.getContent().stream()
+                .filter(Album::isStatus)
+                .collect(Collectors.toList());
+        
+        // Create a new Page with filtered content but preserve original pagination metadata
+        Page<Album> filteredAlbums = new org.springframework.data.domain.PageImpl<>(
+                enabledAlbums, 
+                pageRequest, 
+                albums.getTotalElements()
+        );
+        
+        return ResponseEntity.ok(filteredAlbums);
     }
 
     @PostMapping
